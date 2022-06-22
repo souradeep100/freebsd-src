@@ -52,7 +52,7 @@ static device_method_t vmbus_res_methods[] = {
 	DEVMETHOD(device_shutdown,		bus_generic_shutdown),
 	DEVMETHOD(device_suspend,		bus_generic_suspend),
 	DEVMETHOD(device_resume,		bus_generic_resume),
-
+	DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
 	DEVMETHOD_END
 };
 
@@ -84,7 +84,10 @@ vmbus_res_probe(device_t dev)
 static int
 vmbus_res_attach(device_t dev __unused)
 {
-
+#if 1
+	bus_generic_probe(dev);
+	bus_generic_attach(dev);
+#endif
 	return (0);
 }
 

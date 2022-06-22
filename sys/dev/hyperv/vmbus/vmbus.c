@@ -132,7 +132,7 @@ static void			vmbus_intr_teardown(struct vmbus_softc *);
 static int			vmbus_doattach(struct vmbus_softc *);
 static void			vmbus_event_proc_dummy(struct vmbus_softc *,
 				    int);
-
+static int			vmbus_handle_intr_new(void *);
 static struct vmbus_softc	*vmbus_sc;
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
@@ -209,7 +209,12 @@ static driver_t vmbus_driver = {
 };
 
 DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
+#if 0
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
+#else
+DRIVER_MODULE(vmbus, vmbus_res, vmbus_driver,
+		NULL,NULL);
+#endif
 
 MODULE_DEPEND(vmbus, acpi, 1, 1, 1);
 MODULE_DEPEND(vmbus, pci, 1, 1, 1);
@@ -725,7 +730,12 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 
 	return (FILTER_HANDLED);
 }
-
+static int
+vmbus_handle_intr_new(void *arg)
+{
+	vmbus_handle_intr(NULL);
+	return (0);
+}
 void
 vmbus_handle_intr(struct trapframe *trap_frame)
 {
@@ -981,7 +991,33 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		TASK_INIT(VMBUS_PCPU_PTR(sc, message_task, cpu), 0,
 		    vmbus_msg_task, sc);
 	}
-
+#if 1
+	int vector = 0;
+	struct resource *res;
+	void *cookiep;
+	res = bus_alloc_resource_any(device_get_parent(sc->vmbus_dev),
+				SYS_RES_IRQ, &vector, RF_ACTIVE | RF_SHAREABLE);
+	if (res == NULL) {
+		device_printf(sc->vmbus_dev,
+			"bus_alloc_resouce_any failed\n");
+		return (ENXIO);
+	} else {
+		device_printf(sc->vmbus_dev,
+			"irq %ju, vector %d\n",
+		rman_get_start(res), vector);
+	}
+	int err;
+	err = bus_setup_intr(sc->vmbus_dev, res, INTR_TYPE_MISC | INTR_MPSAFE,
+							 vmbus_handle_intr_new, NULL,  sc, &cookiep);
+	if (err) {
+		device_printf(sc->vmbus_dev, "failed to setup IRQ %d\n",err);
+		return (err);
+	}
+	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
+	return 0;
+	
+#endif
+#if 0
 #if defined(__amd64__) && defined(KLD_MODULE)
 	pmap_pti_add_kva(VMBUS_ISR_ADDR, VMBUS_ISR_ADDR + PAGE_SIZE, true);
 #endif
@@ -1004,6 +1040,7 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		    sc->vmbus_idtvec);
 	}
 	return 0;
+#endif
 }
 
 static void
@@ -1469,6 +1506,32 @@ vmbus_doattach(struct vmbus_softc *sc)
 #ifdef NEW_PCIB
 	vmbus_get_mmio_res(sc->vmbus_dev);
 	vmbus_fb_mmio_res(sc->vmbus_dev);
+#endif
+#if 0 /*XXX weh*/
+	int vector = 0;
+	struct resource *res;
+	void *cookiep;
+	res = bus_alloc_resource_any(device_get_parent(sc->vmbus_dev),
+				SYS_RES_IRQ, &vector, RF_ACTIVE | RF_SHAREABLE);
+	if (res == NULL) {
+		device_printf(sc->vmbus_dev,
+			"bus_alloc_resouce_any failed\n");
+		return (ENXIO);
+	} else {
+		device_printf(sc->vmbus_dev,
+			"irq %ju, vector %d\n",
+		rman_get_start(res), vector);
+	}
+	int err;
+	err = bus_setup_intr(sc->vmbus_dev, res, INTR_TYPE_NET | INTR_MPSAFE,
+							NULL,  vmbus_handle_intr_new, sc, &cookiep);
+	if (err) {
+		device_printf(sc-vmbus_dev, "failed to setup IRQ\n");
+		return (err);
+	}
+	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
+
+	
 #endif
 
 	sc->vmbus_flags |= VMBUS_FLAG_ATTACHED;
