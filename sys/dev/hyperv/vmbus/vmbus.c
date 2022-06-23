@@ -246,7 +246,7 @@ vmbus_msghc_get(struct vmbus_softc *sc, size_t dsize)
 {
 	struct vmbus_msghc *mh;
 	struct vmbus_xact *xact;
-
+	device_printf(sc->vmbus_dev,"vmbus_msghc_get called\n");
 	if (dsize > HYPERCALL_POSTMSGIN_DSIZE_MAX)
 		panic("invalid data size %zu", dsize);
 
@@ -259,6 +259,7 @@ vmbus_msghc_get(struct vmbus_softc *sc, size_t dsize)
 	mh->mh_xact = xact;
 
 	vmbus_msghc_reset(mh, dsize);
+	device_printf(sc->vmbus_dev,"vmbus_msghc_get returning\n");
 	return (mh);
 }
 
@@ -423,7 +424,7 @@ vmbus_connect(struct vmbus_softc *sc, uint32_t version)
 	const struct vmbus_message *msg;
 	struct vmbus_msghc *mh;
 	int error, done = 0;
-
+	device_printf(sc->vmbus_dev,"vmbus_connect\n");
 	mh = vmbus_msghc_get(sc, sizeof(*req));
 	if (mh == NULL)
 		return ENXIO;
@@ -457,7 +458,6 @@ vmbus_init(struct vmbus_softc *sc)
 
 	for (i = 0; i < nitems(vmbus_version); ++i) {
 		int error;
-
 		error = vmbus_connect(sc, vmbus_version[i]);
 		if (!error) {
 			vmbus_current_version = vmbus_version[i];
@@ -767,7 +767,7 @@ vmbus_synic_setup(void *xsc)
 	int cpu = curcpu;
 	uint64_t val, orig;
 	uint32_t sint;
-
+	device_printf(sc->vmbus_dev,"inside vmbus_synic_setup\n");
 	if (hyperv_features & CPUID_HV_MSR_VP_INDEX) {
 		/* Save virtual processor id. */
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = rdmsr(MSR_HV_VP_INDEX);
@@ -788,6 +788,7 @@ vmbus_synic_setup(void *xsc)
 	/*
 	 * Setup the SynIC event flags.
 	 */
+	device_printf(sc->vmbus_dev,"before  rdmsr MSR_HV_SIEFP\n");
 	orig = rdmsr(MSR_HV_SIEFP);
 	val = MSR_HV_SIEFP_ENABLE | (orig & MSR_HV_SIEFP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, event_flags_dma.hv_paddr, cpu)
@@ -802,6 +803,7 @@ vmbus_synic_setup(void *xsc)
 	orig = rdmsr(sint);
 	val = sc->vmbus_idtvec | MSR_HV_SINT_AUTOEOI |
 	    (orig & MSR_HV_SINT_RSVD_MASK);
+	device_printf(sc->vmbus_dev,"before wrmsr sint VMBUS_SINT_MESSAGE\n");
 	wrmsr(sint, val);
 
 	/*
@@ -811,14 +813,17 @@ vmbus_synic_setup(void *xsc)
 	orig = rdmsr(sint);
 	val = sc->vmbus_idtvec | MSR_HV_SINT_AUTOEOI |
 	    (orig & MSR_HV_SINT_RSVD_MASK);
+	device_printf(sc->vmbus_dev,"before wrmsr sint VMBUS_SINT_TIMER\n");
 	wrmsr(sint, val);
 
 	/*
 	 * All done; enable SynIC.
 	 */
+	device_printf(sc->vmbus_dev,"before synic enabled\n");
 	orig = rdmsr(MSR_HV_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	wrmsr(MSR_HV_SCONTROL, val);
+	device_printf(sc->vmbus_dev,"synic enabled\n");
 }
 
 static void
@@ -1014,6 +1019,7 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		return (err);
 	}
 	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
+	sc->vmbus_idtvec = 52;
 	return 0;
 	
 #endif
@@ -1026,7 +1032,7 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 	 * All Hyper-V ISR required resources are setup, now let's find a
 	 * free IDT vector for Hyper-V ISR and set it up.
 	 */
-	sc->vmbus_idtvec = lapic_ipi_alloc(pti ? IDTVEC(vmbus_isr_pti) :
+	sc->vmbus_idtvec = LAPIC_ipi_alloc(pti ? IDTVEC(vmbus_isr_pti) :
 	    IDTVEC(vmbus_isr));
 	if (sc->vmbus_idtvec < 0) {
 #if defined(__amd64__) && defined(KLD_MODULE)
@@ -1581,6 +1587,7 @@ vmbus_doattach(struct vmbus_softc *sc)
 	/*
 	 * Initialize vmbus, e.g. connect to Hypervisor.
 	 */
+	device_printf(sc->vmbus_dev,"init of vmbus \n");
 	ret = vmbus_init(sc);
 	if (ret != 0)
 		goto cleanup;
