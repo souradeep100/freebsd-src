@@ -734,7 +734,7 @@ static int
 vmbus_handle_intr_new(void *arg)
 {
 	vmbus_handle_intr(NULL);
-	return (0);
+	return(FILTER_HANDLED);
 }
 void
 vmbus_handle_intr(struct trapframe *trap_frame)
@@ -801,7 +801,7 @@ vmbus_synic_setup(void *xsc)
 	 */
 	sint = MSR_HV_SINT0 + VMBUS_SINT_MESSAGE;
 	orig = rdmsr(sint);
-	val = sc->vmbus_idtvec | MSR_HV_SINT_AUTOEOI |
+	val = sc->vmbus_idtvec | 
 	    (orig & MSR_HV_SINT_RSVD_MASK);
 	device_printf(sc->vmbus_dev,"before wrmsr sint VMBUS_SINT_MESSAGE\n");
 	wrmsr(sint, val);
@@ -811,7 +811,7 @@ vmbus_synic_setup(void *xsc)
 	 */
 	sint = MSR_HV_SINT0 + VMBUS_SINT_TIMER;
 	orig = rdmsr(sint);
-	val = sc->vmbus_idtvec | MSR_HV_SINT_AUTOEOI |
+	val = sc->vmbus_idtvec | 
 	    (orig & MSR_HV_SINT_RSVD_MASK);
 	device_printf(sc->vmbus_dev,"before wrmsr sint VMBUS_SINT_TIMER\n");
 	wrmsr(sint, val);
@@ -1020,6 +1020,7 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 	}
 	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
 	sc->vmbus_idtvec = 52;
+	//setidt(sc->vmbus_idtvec, vmbus_handle_intr_new, 14, SEL_KPL, 0);
 	return 0;
 	
 #endif
