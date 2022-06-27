@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/vmbus_reg.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
 #include <dev/hyperv/vmbus/vmbus_chanvar.h>
+#include <dev/psci/smccc.h>
 
 #include "acpi_if.h"
 #include "pcib_if.h"
@@ -134,6 +135,41 @@ static void			vmbus_event_proc_dummy(struct vmbus_softc *,
 				    int);
 static int			vmbus_handle_intr_new(void *);
 static struct vmbus_softc	*vmbus_sc;
+static void			arm_hv_set_reg(u_int, uint64_t);
+
+#if 1
+#define HVCALL_SET_VP_REGISTERS 0x0051
+#define HV_HYPERCALL_FAST_BIT BIT(16)
+#define HV_HYPERCALL_REP_COMP_1     BIT_ULL(32)
+#define HV_PARTITION_ID_SELF        ((u64)-1)
+#define HV_VP_INDEX_SELF        ((u32)-2)
+#define HV_SMCCC_FUNC_NUMBER	1
+
+#define HV_FUNC_ID SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,    \
+    SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER))
+static
+void arm_hv_set_reg(u32 msr, u64 value)
+{
+    struct arm_smccc_res res;
+
+    arm_smccc_hvc(HV_FUNC_ID,
+        HVCALL_SET_VP_REGISTERS | HV_HYPERCALL_FAST_BIT |
+            HV_HYPERCALL_REP_COMP_1,
+        HV_PARTITION_ID_SELF,
+        HV_VP_INDEX_SELF,
+        msr,
+        0,
+        value,
+        0,
+        &res);
+
+    /*
+     * Something is fundamentally broken in the hypervisor if
+     * setting a VP register fails. There's really no way to
+     * continue as a guest VM, so panic.
+     */
+}
+#endif /*arm hv set register*/
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "Hyper-V vmbus");
