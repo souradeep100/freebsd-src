@@ -282,6 +282,8 @@ device		aw_thermal	# Allwinner Thermal Sensor Controller
 
 # HID support
 device		hid		# Generic HID support
+options     HYPERV
+device		hyperv
 
 # Flattened Device Tree
 options 	FDT			# Configure using FDT/DTB data

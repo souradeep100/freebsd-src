@@ -33,5 +33,12 @@
 
 uint64_t	hypercall_md(volatile void *hc_addr, uint64_t in_val,
 		    uint64_t in_paddr, uint64_t out_paddr);
-
+#if 1
+typedef uint32_t u32;
+typedef uint64_t u64;
+void arm_hv_set_vreg(u32 msr, u64 val);
+#define WRMSR(msr, val) arm_hv_set_vreg(msr, val)
+u64 arm_hv_get_vreg(u32 msr);
+#define RDMSR(msr) arm_hv_get_vreg(msr)
+#endif
 #endif	/* !_HYPERV_MACHDEP_H_ */

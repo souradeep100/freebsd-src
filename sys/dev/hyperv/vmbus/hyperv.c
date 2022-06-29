@@ -81,10 +81,10 @@ u_int				hyperv_ver_major;
 
 u_int				hyperv_features;
 u_int				hyperv_recommends;
-
+#if 0
 static u_int			hyperv_pm_features;
 static u_int			hyperv_features3;
-
+#endif
 hyperv_tc64_t			hyperv_tc64;
 
 static struct timecounter	hyperv_timecounter = {
@@ -103,14 +103,14 @@ static struct hypercall_ctx	hypercall_context;
 static u_int
 hyperv_get_timecount(struct timecounter *tc __unused)
 {
-	return rdmsr(MSR_HV_TIME_REF_COUNT);
+	return RDMSR(MSR_HV_TIME_REF_COUNT);
 }
 
 static uint64_t
-hyperv_tc64_rdmsr(void)
+hyperv_tc64_RDMSR(void)
 {
 
-	return (rdmsr(MSR_HV_TIME_REF_COUNT));
+	return (RDMSR(MSR_HV_TIME_REF_COUNT));
 }
 
 uint64_t
@@ -143,6 +143,7 @@ hyperv_guid2str(const struct hyperv_guid *guid, char *buf, size_t sz)
 static bool
 hyperv_identify(void)
 {
+#if 0
 	u_int regs[4];
 	unsigned int maxleaf;
 
@@ -230,7 +231,7 @@ hyperv_identify(void)
 			    regs[0], regs[3]);
 		}
 	}
-
+#endif
 	return (true);
 }
 
@@ -245,7 +246,7 @@ hyperv_init(void *dummy __unused)
 	}
 
 	/* Set guest id */
-	wrmsr(MSR_HV_GUEST_OS_ID, MSR_HV_GUESTID_FREEBSD);
+	WRMSR(MSR_HV_GUEST_OS_ID, MSR_HV_GUESTID_FREEBSD);
 
 	if (hyperv_features & CPUID_HV_MSR_TIME_REFCNT) {
 		/*
@@ -259,7 +260,7 @@ hyperv_init(void *dummy __unused)
 		 * Install 64 bits timecounter method for other modules
 		 * to use.
 		 */
-		hyperv_tc64 = hyperv_tc64_rdmsr;
+		hyperv_tc64 = hyperv_tc64_RDMSR;
 	}
 }
 SYSINIT(hyperv_initialize, SI_SUB_HYPERVISOR, SI_ORDER_FIRST, hyperv_init,
@@ -291,7 +292,7 @@ hypercall_create(void *arg __unused)
 	hypercall_context.hc_paddr = vtophys(hypercall_context.hc_addr);
 
 	/* Get the 'reserved' bits, which requires preservation. */
-	hc_orig = rdmsr(MSR_HV_HYPERCALL);
+	hc_orig = RDMSR(MSR_HV_HYPERCALL);
 
 	/*
 	 * Setup the Hypercall page.
@@ -302,12 +303,12 @@ hypercall_create(void *arg __unused)
 	    MSR_HV_HYPERCALL_PGSHIFT) |
 	    (hc_orig & MSR_HV_HYPERCALL_RSVD_MASK) |
 	    MSR_HV_HYPERCALL_ENABLE;
-	wrmsr(MSR_HV_HYPERCALL, hc);
+	WRMSR(MSR_HV_HYPERCALL, hc);
 
 	/*
 	 * Confirm that Hypercall page did get setup.
 	 */
-	hc = rdmsr(MSR_HV_HYPERCALL);
+	hc = RDMSR(MSR_HV_HYPERCALL);
 	if ((hc & MSR_HV_HYPERCALL_ENABLE) == 0) {
 		printf("hyperv: Hypercall setup failed\n");
 		hypercall_memfree();
@@ -329,8 +330,8 @@ hypercall_destroy(void *arg __unused)
 		return;
 
 	/* Disable Hypercall */
-	hc = rdmsr(MSR_HV_HYPERCALL);
-	wrmsr(MSR_HV_HYPERCALL, (hc & MSR_HV_HYPERCALL_RSVD_MASK));
+	hc = RDMSR(MSR_HV_HYPERCALL);
+	WRMSR(MSR_HV_HYPERCALL, (hc & MSR_HV_HYPERCALL_RSVD_MASK));
 	hypercall_memfree();
 
 	if (bootverbose)

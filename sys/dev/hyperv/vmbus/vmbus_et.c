@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/hyperv_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
-
+#include <dev/hyperv/vmbus/hyperv_machdep.h>
 #define VMBUS_ET_NAME			"hvet"
 
 #define MSR_HV_STIMER0_CFG_SINT		\
@@ -99,7 +99,7 @@ vmbus_et_start(struct eventtimer *et __unused, sbintime_t first,
 
 	current = hyperv_tc64();
 	current += hyperv_sbintime2count(first);
-	wrmsr(MSR_HV_STIMER0_COUNT, current);
+	WRMSR(MSR_HV_STIMER0_COUNT, current);
 
 	return (0);
 }
@@ -158,14 +158,14 @@ vmbus_et_config(void *arg __unused)
 		uint64_t val;
 
 		/* Stop counting, and this also implies disabling STIMER0 */
-		wrmsr(MSR_HV_STIMER0_COUNT, 0);
+		WRMSR(MSR_HV_STIMER0_COUNT, 0);
 
-		val = rdmsr(MSR_HV_STIMER0_CONFIG);
+		val = RDMSR(MSR_HV_STIMER0_CONFIG);
 		if ((val & MSR_HV_STIMER_CFG_ENABLE) == 0)
 			break;
 		cpu_spinwait();
 	}
-	wrmsr(MSR_HV_STIMER0_CONFIG,
+	WRMSR(MSR_HV_STIMER0_CONFIG,
 	    MSR_HV_STIMER_CFG_AUTOEN | MSR_HV_STIMER0_CFG_SINT);
 }
 
