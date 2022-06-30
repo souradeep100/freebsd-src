@@ -72,10 +72,10 @@ vmbus_res_probe(device_t dev)
 {
 	char *id[] = { "VMBUS", NULL };
 	int rv;
-	
+	device_printf(dev, "vmbus res probe called\n");	/*
 	if (device_get_unit(dev) != 0 || vm_guest != VM_GUEST_HV ||
 	    (hyperv_features & CPUID_HV_MSR_SYNIC) == 0)
-		return (ENXIO);
+		return (ENXIO);*/
 	rv = ACPI_ID_PROBE(device_get_parent(dev), dev, id, NULL);
 	if (rv <= 0)
 		device_set_desc(dev, "Hyper-V Vmbus Resource");

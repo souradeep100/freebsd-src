@@ -1480,9 +1480,10 @@ static void
 vmbus_identify(driver_t *driver, device_t parent)
 {
 
-	if (device_get_unit(parent) != 0 || vm_guest != VM_GUEST_HV ||
+	/*if (device_get_unit(parent) != 0 || vm_guest != VM_GUEST_HV ||
 	    (hyperv_features & CPUID_HV_MSR_SYNIC) == 0)
-		return;
+		return;*/
+	device_printf(parent,"vmbus_identify called\n");
 	device_add_child(parent, "vmbus", -1);
 }
 
@@ -1490,10 +1491,11 @@ static int
 vmbus_probe(device_t dev)
 {
 
-	if (device_get_unit(dev) != 0 || vm_guest != VM_GUEST_HV ||
+	/*if (device_get_unit(dev) != 0 || vm_guest != VM_GUEST_HV ||
 	    (hyperv_features & CPUID_HV_MSR_SYNIC) == 0)
 		return (ENXIO);
-
+	*/
+	device_printf(dev,"vmbus_probe called\n");
 	device_set_desc(dev, "Hyper-V Vmbus");
 	return (BUS_PROBE_DEFAULT);
 }
@@ -1669,6 +1671,7 @@ vmbus_attach(device_t dev)
 	 * - Before we request channel offers.
 	 */
 	vmbus_sc->vmbus_event_proc = vmbus_event_proc_dummy;
+	device_printf(dev,"vmbus_attach called\n");
 
 #ifdef EARLY_AP_STARTUP
 	/*
