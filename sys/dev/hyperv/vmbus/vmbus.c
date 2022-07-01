@@ -679,15 +679,16 @@ vmbus_msg_task(void *xsc, int pending __unused)
 		}
 	}
 }
-
+#define HV_REGISTER_EOM         0x000A0014
+#define HV_REGISTER_SINT0       0x000A0000
 static __inline int
 vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 {
 	volatile struct vmbus_message *msg;
 	struct vmbus_message *msg_base;
 
-	msg_base = VMBUS_PCPU_GET(sc, message, cpu);
-
+	msg_base = HV_REGISTER_SINT0;
+	device_printf(sc->vmbus_dev,"vmbus_handle_intr1 inside\n");
 	/*
 	 * Check event timer.
 	 *
@@ -716,7 +717,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 			 * This will cause message queue rescan to possibly
 			 * deliver another msg from the hypervisor
 			 */
-			WRMSR(MSR_HV_EOM, 0);
+			WRMSR(HV_REGISTER_EOM, 0);
 		}
 	}
 
@@ -769,7 +770,9 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 	 */
 	critical_exit();
 }
-
+#define HV_REGISTER_SIMP        0x000A0013
+#define HV_REGISTER_SIEFP       0x000A0012
+#define HV_REGISTER_SCONTROL        0x000A0010
 static void
 vmbus_synic_setup(void *xsc)
 {
@@ -793,7 +796,7 @@ vmbus_synic_setup(void *xsc)
 	val = MSR_HV_SIMP_ENABLE | (orig & MSR_HV_SIMP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, message_dma.hv_paddr, cpu) >> PAGE_SHIFT) <<
 	     MSR_HV_SIMP_PGSHIFT);
-	WRMSR(MSR_HV_SIMP, val);
+	WRMSR(HV_REGISTER_SIMP, val);
 
 	/*
 	 * Setup the SynIC event flags.
@@ -803,13 +806,13 @@ vmbus_synic_setup(void *xsc)
 	val = MSR_HV_SIEFP_ENABLE | (orig & MSR_HV_SIEFP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, event_flags_dma.hv_paddr, cpu)
 	      >> PAGE_SHIFT) << MSR_HV_SIEFP_PGSHIFT);
-	WRMSR(MSR_HV_SIEFP, val);
+	WRMSR(HV_REGISTER_SIEFP, val);
 
 
 	/*
 	 * Configure and unmask SINT for message and event flags.
 	 */
-	sint = MSR_HV_SINT0 + VMBUS_SINT_MESSAGE;
+	sint = HV_REGISTER_SINT0 + VMBUS_SINT_MESSAGE;
 	orig = RDMSR(sint);
 	val = sc->vmbus_idtvec | 
 	    (orig & MSR_HV_SINT_RSVD_MASK);
@@ -819,7 +822,7 @@ vmbus_synic_setup(void *xsc)
 	/*
 	 * Configure and unmask SINT for timer.
 	 */
-	sint = MSR_HV_SINT0 + VMBUS_SINT_TIMER;
+	sint = HV_REGISTER_SINT0 + VMBUS_SINT_TIMER;
 	orig = RDMSR(sint);
 	val = sc->vmbus_idtvec | 
 	    (orig & MSR_HV_SINT_RSVD_MASK);
@@ -832,7 +835,7 @@ vmbus_synic_setup(void *xsc)
 	device_printf(sc->vmbus_dev,"before synic enabled\n");
 	orig = RDMSR(MSR_HV_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
-	WRMSR(MSR_HV_SCONTROL, val);
+	WRMSR(HV_REGISTER_SCONTROL, val);
 	device_printf(sc->vmbus_dev,"synic enabled\n");
 }
 
@@ -1677,6 +1680,7 @@ vmbus_attach(device_t dev)
 	/*
 	 * Defer the real attach until the pause(9) works as expected.
 	 */
+	device_printf(dev,"early_ap_startup. vmbus_intrhook called\n");
 	vmbus_sc->vmbus_intrhook.ich_func = vmbus_intrhook;
 	vmbus_sc->vmbus_intrhook.ich_arg = vmbus_sc;
 	config_intrhook_establish(&vmbus_sc->vmbus_intrhook);
@@ -1687,8 +1691,12 @@ vmbus_attach(device_t dev)
 	 * cold set to zero, we just call the driver
 	 * initialization directly.
 	 */
+	cold=0;
 	if (!cold)
+	{
+		device_printf(dev,"cold vmbus_doattach called\n");
 		vmbus_doattach(vmbus_sc);
+	}
 #endif	/* EARLY_AP_STARTUP */
 
 	return (0);

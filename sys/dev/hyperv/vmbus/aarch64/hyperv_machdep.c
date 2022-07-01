@@ -71,8 +71,12 @@ u64 arm_hv_get_vreg(u32 msr);
 void arm_hv_set_vreg(u32 msr, u64 value)
 {
     struct arm_smccc_res res;
-
-    arm_smccc_hvc (HV_FUNC_ID,
+	printf("inside arm_hv_set_vreg\n");
+	int64_t hv_func_id;
+	hv_func_id = SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,
+							SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER));
+	printf("inside arm_hv_set_vreg hv_func_id set hv_func_id %lu \n",hv_func_id);
+    arm_smccc_hvc (hv_func_id,
         HVCALL_SET_VP_REGISTERS | HV_HYPERCALL_FAST_BIT |
             HV_HYPERCALL_REP_COMP_1,
         HV_PARTITION_ID_SELF,

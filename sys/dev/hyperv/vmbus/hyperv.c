@@ -143,6 +143,7 @@ hyperv_guid2str(const struct hyperv_guid *guid, char *buf, size_t sz)
 static bool
 hyperv_identify(void)
 {
+	printf("Hyper-V identify\n");
 #if 0
 	u_int regs[4];
 	unsigned int maxleaf;
@@ -234,10 +235,11 @@ hyperv_identify(void)
 #endif
 	return (true);
 }
-
+#define HV_REGISTER_GUEST_OSID      0x00090002
 static void
 hyperv_init(void *dummy __unused)
 {
+	printf("Hyper-V init\n");
 	if (!hyperv_identify()) {
 		/* Not Hyper-V; reset guest id to the generic one. */
 		if (vm_guest == VM_GUEST_HV)
@@ -246,8 +248,8 @@ hyperv_init(void *dummy __unused)
 	}
 
 	/* Set guest id */
-	WRMSR(MSR_HV_GUEST_OS_ID, MSR_HV_GUESTID_FREEBSD);
-
+	WRMSR(HV_REGISTER_GUEST_OSID, MSR_HV_GUESTID_FREEBSD);
+	printf("Hyper-V WRMSR done\n");
 	if (hyperv_features & CPUID_HV_MSR_TIME_REFCNT) {
 		/*
 		 * Register Hyper-V timecounter.  This should be done as early
@@ -261,6 +263,7 @@ hyperv_init(void *dummy __unused)
 		 * to use.
 		 */
 		hyperv_tc64 = hyperv_tc64_RDMSR;
+		printf("Hyper-V crashing here\n");
 	}
 }
 SYSINIT(hyperv_initialize, SI_SUB_HYPERVISOR, SI_ORDER_FIRST, hyperv_init,
