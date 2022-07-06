@@ -638,6 +638,7 @@ vmbus_chanmsg_handle(struct vmbus_softc *sc, const struct vmbus_message *msg)
 
 	/* Channel specific processing */
 	vmbus_chan_msgproc(sc, msg);
+	device_printf(sc->vmbus_dev,"returned from vmbus_chanmsg_handle vmbus_chan_msgproc\n");
 }
 
 static void
@@ -738,6 +739,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	 * Check messages.  Mainly management stuffs; ultra low rate.
 	 */
 	msg = msg_base + VMBUS_SINT_MESSAGE;
+	device_printf(sc->vmbus_dev, "vmbus_handle_intr1 msg_type 0x%x and msg flag 0x%x\n",msg->msg_type, msg->msg_flags);
 	if (__predict_false(msg->msg_type != HYPERV_MSGTYPE_NONE)) {
 		taskqueue_enqueue(VMBUS_PCPU_GET(sc, message_tq, cpu),
 		    VMBUS_PCPU_PTR(sc, message_task, cpu));
@@ -1651,6 +1653,7 @@ cleanup:
 static void
 vmbus_event_proc_dummy(struct vmbus_softc *sc __unused, int cpu __unused)
 {
+	device_printf(sc->vmbus_dev, "vmbus_event_proc_dummy is called\n");
 }
 
 #ifdef EARLY_AP_STARTUP
