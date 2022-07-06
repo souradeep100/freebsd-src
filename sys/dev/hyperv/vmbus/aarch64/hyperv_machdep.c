@@ -175,7 +175,22 @@ hypercall_md(volatile void *hc_addr, uint64_t in_val,
     uint64_t in_paddr, uint64_t out_paddr)
 {
 	/* need to implement */
-	return (0);
+	struct arm_smccc_res res;
+	printf("inside hypercall_md\n");
+	int64_t hv_func_id;
+	hv_func_id = SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,
+							SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER));
+    arm_smccc_hvc (hv_func_id,
+        in_val,
+        in_paddr,
+        out_paddr,
+        0,
+        0,
+        0,
+        0,
+        &res);
+
+	return (res.a0);
 }
 #if 0
 static int

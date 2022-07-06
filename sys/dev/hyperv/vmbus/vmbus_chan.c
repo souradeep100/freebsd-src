@@ -1538,7 +1538,7 @@ vmbus_event_flags_proc(struct vmbus_softc *sc, volatile u_long *event_flags,
     int flag_cnt)
 {
 	int f;
-
+	device_printf(sc->vmbus_dev,"vmbus flag_cnt %d event_flag %lu\n",flag_cnt, *event_flags);
 	for (f = 0; f < flag_cnt; ++f) {
 		uint32_t chid_base;
 		u_long flags;
@@ -1549,7 +1549,7 @@ vmbus_event_flags_proc(struct vmbus_softc *sc, volatile u_long *event_flags,
 
 		flags = atomic_swap_long(&event_flags[f], 0);
 		chid_base = f << VMBUS_EVTFLAG_SHIFT;
-
+		device_printf(sc->vmbus_dev,"vmbus_event_flags_proc before while\n");
 		while ((chid_ofs = ffsl(flags)) != 0) {
 			struct vmbus_channel *chan;
 
@@ -1562,10 +1562,11 @@ vmbus_event_flags_proc(struct vmbus_softc *sc, volatile u_long *event_flags,
 				continue;
 			}
 			__compiler_membar();
-
+			device_printf(sc->vmbus_dev,"vmbus_event_flags_proc after compiler_membar\n");
 			if (chan->ch_flags & VMBUS_CHAN_FLAG_BATCHREAD)
 				vmbus_rxbr_intr_mask(&chan->ch_rxbr);
 			taskqueue_enqueue(chan->ch_tq, &chan->ch_task);
+			device_printf(sc->vmbus_dev,"vmbus_event_flags_proc taskqueue_enqueued\n");
 		}
 	}
 }
@@ -1579,6 +1580,7 @@ vmbus_event_proc(struct vmbus_softc *sc, int cpu)
 	 * On Host with Win8 or above, the event page can be checked directly
 	 * to get the id of the channel that has the pending interrupt.
 	 */
+	device_printf(sc->vmbus_dev,"vmbus inside vmbus_event_proc\n");
 	eventf = VMBUS_PCPU_GET(sc, event_flags, cpu) + VMBUS_SINT_MESSAGE;
 	vmbus_event_flags_proc(sc, eventf->evt_flags,
 	    VMBUS_PCPU_GET(sc, event_flags_cnt, cpu));
@@ -1588,7 +1590,7 @@ void
 vmbus_event_proc_compat(struct vmbus_softc *sc, int cpu)
 {
 	struct vmbus_evtflags *eventf;
-
+	device_printf(sc->vmbus_dev,"vmbus inside vmbus_event_proc_compat\n");
 	eventf = VMBUS_PCPU_GET(sc, event_flags, cpu) + VMBUS_SINT_MESSAGE;
 	if (atomic_testandclear_long(&eventf->evt_flags[0], 0)) {
 		vmbus_event_flags_proc(sc, sc->vmbus_rx_evtflags,

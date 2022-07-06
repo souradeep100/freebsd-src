@@ -687,18 +687,20 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	volatile struct vmbus_message *msg;
 	struct vmbus_message *msg_base;
 
-	msg_base = HV_REGISTER_SINT0;
 	device_printf(sc->vmbus_dev,"vmbus_handle_intr1 inside\n");
+	msg_base = VMBUS_PCPU_GET(sc, message, cpu);
 	/*
 	 * Check event timer.
 	 *
 	 * TODO: move this to independent IDT vector.
 	 */
 	msg = msg_base + VMBUS_SINT_TIMER;
+	device_printf(sc->vmbus_dev,"vmbus_handle_intr1 msg_base\n");
 	if (msg->msg_type == HYPERV_MSGTYPE_TIMER_EXPIRED) {
 		msg->msg_type = HYPERV_MSGTYPE_NONE;
 
 		vmbus_et_intr(frame);
+		device_printf(sc->vmbus_dev,"vmbus_et_intr set\n");
 
 		/*
 		 * Make sure the write to msg_type (i.e. set to
@@ -718,6 +720,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 			 * deliver another msg from the hypervisor
 			 */
 			WRMSR(HV_REGISTER_EOM, 0);
+			device_printf(sc->vmbus_dev,"HV_REGISTER_EOM\n");
 		}
 	}
 
@@ -728,6 +731,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	 * As recommended by the Windows guest fellows, we check events before
 	 * checking messages.
 	 */
+	device_printf(sc->vmbus_dev,"mbus_event_proc called\n");
 	sc->vmbus_event_proc(sc, cpu);
 
 	/*
@@ -737,6 +741,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	if (__predict_false(msg->msg_type != HYPERV_MSGTYPE_NONE)) {
 		taskqueue_enqueue(VMBUS_PCPU_GET(sc, message_tq, cpu),
 		    VMBUS_PCPU_PTR(sc, message_task, cpu));
+			device_printf(sc->vmbus_dev,"VMBUS_SINT_MESSAGE\n");
 	}
 
 	return (FILTER_HANDLED);
@@ -756,12 +761,14 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 	/*
 	 * Disable preemption.
 	 */
+	printf("vmbus_dev vmbus_handle_intr inside\n");
+
 	critical_enter();
 
 	/*
 	 * Do a little interrupt counting.
 	 */
-	(*VMBUS_PCPU_GET(sc, intr_cnt, cpu))++;
+	//(*VMBUS_PCPU_GET(sc, intr_cnt, cpu))++;
 
 	vmbus_handle_intr1(sc, trap_frame, cpu);
 
@@ -1033,7 +1040,7 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		return (err);
 	}
 	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
-	sc->vmbus_idtvec = rman_get_start(res);
+	sc->vmbus_idtvec = 3;
 	//setidt(sc->vmbus_idtvec, vmbus_handle_intr_new, 14, SEL_KPL, 0);
 	return 0;
 	

@@ -144,6 +144,7 @@ static bool
 hyperv_identify(void)
 {
 	printf("Hyper-V identify\n");
+	vm_guest = VM_GUEST_HV;
 #if 0
 	u_int regs[4];
 	unsigned int maxleaf;
@@ -312,6 +313,7 @@ hypercall_create(void *arg __unused)
 	 * Confirm that Hypercall page did get setup.
 	 */
 	hc = RDMSR(MSR_HV_HYPERCALL);
+	hc = MSR_HV_HYPERCALL_ENABLE;
 	if ((hc & MSR_HV_HYPERCALL_ENABLE) == 0) {
 		printf("hyperv: Hypercall setup failed\n");
 		hypercall_memfree();
