@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 
 #define VMBUS_GPADL_START		0xe1e10
 
+#define HV_REGISTER_EOM         0x000A0014
 struct vmbus_msghc {
 	struct vmbus_xact		*mh_xact;
 	struct hypercall_postmsg_in	mh_inprm_save;
@@ -676,11 +677,10 @@ vmbus_msg_task(void *xsc, int pending __unused)
 			 * This will cause message queue rescan to possibly
 			 * deliver another msg from the hypervisor
 			 */
-			WRMSR(MSR_HV_EOM, 0);
+			WRMSR(HV_REGISTER_EOM, 0);
 		}
 	}
 }
-#define HV_REGISTER_EOM         0x000A0014
 #define HV_REGISTER_SINT0       0x000A0000
 static __inline int
 vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
@@ -1031,18 +1031,18 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		return (ENXIO);
 	} else {
 		device_printf(sc->vmbus_dev,
-			"irq %ju, vector %d\n",
-		rman_get_start(res), vector);
+			"irq 0x%lx, vector %d end 0x%lx\n",
+		(uint64_t)rman_get_start(res), vector, (uint64_t)rman_get_end(res));
 	}
 	int err;
-	err = bus_setup_intr(sc->vmbus_dev, res, INTR_TYPE_MISC | INTR_MPSAFE,
+	err = bus_setup_intr(sc->vmbus_dev, res, INTR_TYPE_MISC ,
 							 vmbus_handle_intr_new, NULL,  sc, &cookiep);
 	if (err) {
 		device_printf(sc->vmbus_dev, "failed to setup IRQ %d\n",err);
 		return (err);
 	}
 	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
-	sc->vmbus_idtvec = 3;
+	sc->vmbus_idtvec = 18;
 	//setidt(sc->vmbus_idtvec, vmbus_handle_intr_new, 14, SEL_KPL, 0);
 	return 0;
 	
