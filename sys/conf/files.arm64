@@ -609,3 +609,4 @@ dev/hyperv/vmbus/aarch64/hyperv_machdep.c         optional    hyperv
 dev/hyperv/vmbus/vmbus_chan.c			optional 		hyperv
 dev/hyperv/vmbus/hyperv_busdma.c		optional hyperv
 dev/hyperv/vmbus/vmbus_br.c				optional 	hyperv
+dev/hyperv/storvsc/hv_storvsc_drv_freebsd.c optional hyperv
