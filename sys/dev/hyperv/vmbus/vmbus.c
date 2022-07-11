@@ -1042,7 +1042,10 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		return (err);
 	}
 	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
-	sc->vmbus_idtvec = 18;
+	struct intr_map_data_acpi *irq_data;
+	irq_data = (struct intr_map_data_acpi *) rman_get_virtual(res);
+	device_printf(sc->vmbus_dev,"the irq %u\n",irq_data->irq); 
+	sc->vmbus_idtvec = irq_data->irq;
 	//setidt(sc->vmbus_idtvec, vmbus_handle_intr_new, 14, SEL_KPL, 0);
 	return 0;
 	
