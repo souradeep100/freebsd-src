@@ -936,7 +936,7 @@ storvsc_create_chan_sel(struct storvsc_softc *sc)
 	nsubch = sc->hs_nchan - 1;
 	if (nsubch == 0)
 		return;
-
+	printf("storvsc_create_chan_sel inside\n");
 	subch = vmbus_subchan_get(sc->hs_chan, nsubch);
 	for (i = 0; i < nsubch; i++)
 		sc->hs_sel_chan[i + 1] = subch[i];
@@ -970,7 +970,7 @@ storvsc_init_requests(device_t dev)
 		device_printf(dev, "failed to create storvsc dma tag\n");
 		return (error);
 	}
-
+	device_printf(dev, "storvsc_init_requests inside\n");
 	for (i = 0; i < sc->hs_drv_props->drv_max_ios_per_target; ++i) {
 		reqp = malloc(sizeof(struct hv_storvsc_request),
 				 M_DEVBUF, M_WAITOK|M_ZERO);
@@ -1095,7 +1095,7 @@ storvsc_attach(device_t dev)
 	sc->hs_dev	= dev;
 
 	mtx_init(&sc->hs_lock, "hvslck", NULL, MTX_DEF);
-
+	printf("storvsc_attach storvsc calling storvsc_init_requests\n");
 	ret = storvsc_init_requests(dev);
 	if (ret != 0)
 		goto cleanup;
@@ -1105,7 +1105,7 @@ storvsc_attach(device_t dev)
 		g_hv_sgl_page_pool.is_init = TRUE;
 		LIST_INIT(&g_hv_sgl_page_pool.in_use_sgl_list);
 		LIST_INIT(&g_hv_sgl_page_pool.free_sgl_list);
-
+		printf("storvsc_attach LIST_INIT is done\n");
 		/*
 		 * Pre-create SG list, each SG list with
 		 * STORVSC_DATA_SEGCNT_MAX segments, each
@@ -1134,12 +1134,13 @@ storvsc_attach(device_t dev)
 	sc->hs_destroy = FALSE;
 	sc->hs_drain_notify = FALSE;
 	sema_init(&sc->hs_drain_sema, 0, "Store Drain Sema");
+	printf("storvsc_attach calling hv_storvsc_connect\n");
 
 	ret = hv_storvsc_connect_vsp(sc);
 	if (ret != 0) {
 		goto cleanup;
 	}
-
+	printf("storvsc_attach calling storvsc_create_chan_sel\n");
 	/* Construct cpu to channel mapping */
 	storvsc_create_chan_sel(sc);
 
@@ -1147,6 +1148,7 @@ storvsc_attach(device_t dev)
 	 * Create the device queue.
 	 * Hyper-V maps each target to one SCSI HBA
 	 */
+	printf("storvsc_attach calling  cam_simq_alloc\n");
 	devq = cam_simq_alloc(sc->hs_drv_props->drv_max_ios_per_target);
 	if (devq == NULL) {
 		device_printf(dev, "Failed to alloc device queue\n");
@@ -1170,6 +1172,7 @@ storvsc_attach(device_t dev)
 		goto cleanup;
 	}
 
+	printf("storvsc_attach xpt_bus_register\n");
 	mtx_lock(&sc->hs_lock);
 	/* bus_id is set to 0, need to get it from VMBUS channel query? */
 	if (xpt_bus_register(sc->hs_sim, dev, 0) != CAM_SUCCESS) {
@@ -1179,7 +1182,7 @@ storvsc_attach(device_t dev)
 		ret = ENXIO;
 		goto cleanup;
 	}
-
+	printf("storvsc_attach xpt_create_path\n");
 	if (xpt_create_path(&sc->hs_path, /*periph*/NULL,
 		 cam_sim_path(sc->hs_sim),
 		CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
@@ -1192,7 +1195,7 @@ storvsc_attach(device_t dev)
 	}
 
 	mtx_unlock(&sc->hs_lock);
-
+	printf("storvsc_attach storvsc_sysctl\n");
 	storvsc_sysctl(dev);
 
 	root_mount_rel(root_mount_token);

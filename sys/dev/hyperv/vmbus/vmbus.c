@@ -322,6 +322,7 @@ vmbus_msghc_exec_noresult(struct vmbus_msghc *mh)
 		uint64_t status;
 
 		status = hypercall_post_message(inprm_paddr);
+		printf("vmbus_msghc_exec_noresult hypercall_post_message status %lu\n",status);
 		if (status == HYPERCALL_STATUS_SUCCESS)
 			return 0;
 
