@@ -113,9 +113,7 @@ static uint32_t			vmbus_get_vcpu_id_method(device_t bus,
 				    device_t dev, int cpu);
 static struct taskqueue		*vmbus_get_eventtq_method(device_t, device_t,
 				    int);
-#ifdef EARLY_AP_STARTUP
 static void			vmbus_intrhook(void *);
-#endif
 
 static int			vmbus_init(struct vmbus_softc *);
 static int			vmbus_connect(struct vmbus_softc *, uint32_t);
@@ -696,6 +694,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	 *
 	 * TODO: move this to independent IDT vector.
 	 */
+#if 0
 	msg = msg_base + VMBUS_SINT_TIMER;
 	device_printf(sc->vmbus_dev,"vmbus_handle_intr1 msg_base\n");
 	if (msg->msg_type == HYPERV_MSGTYPE_TIMER_EXPIRED) {
@@ -725,7 +724,7 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 			device_printf(sc->vmbus_dev,"HV_REGISTER_EOM\n");
 		}
 	}
-
+#endif
 	/*
 	 * Check events.  Hot path for network and storage I/O data; high rate.
 	 *
@@ -832,13 +831,14 @@ vmbus_synic_setup(void *xsc)
 	/*
 	 * Configure and unmask SINT for timer.
 	 */
+#if 0
 	sint = HV_REGISTER_SINT0 + VMBUS_SINT_TIMER;
 	orig = RDMSR(sint);
 	val = sc->vmbus_idtvec | 
 	    (orig & MSR_HV_SINT_RSVD_MASK);
 	device_printf(sc->vmbus_dev,"before WRMSR sint VMBUS_SINT_TIMER\n");
 	WRMSR(sint, val);
-
+#endif
 	/*
 	 * All done; enable SynIC.
 	 */
@@ -871,10 +871,11 @@ vmbus_synic_teardown(void *arg)
 	/*
 	 * Mask timer SINT.
 	 */
+#if 0
 	sint = MSR_HV_SINT0 + VMBUS_SINT_TIMER;
 	orig = RDMSR(sint);
 	WRMSR(sint, orig | MSR_HV_SINT_MASKED);
-
+#endif
 	/*
 	 * Teardown SynIC message.
 	 */
@@ -1660,7 +1661,6 @@ vmbus_event_proc_dummy(struct vmbus_softc *sc __unused, int cpu __unused)
 	device_printf(sc->vmbus_dev, "vmbus_event_proc_dummy is called\n");
 }
 
-#ifdef EARLY_AP_STARTUP
 
 static void
 vmbus_intrhook(void *xsc)
@@ -1673,7 +1673,6 @@ vmbus_intrhook(void *xsc)
 	config_intrhook_disestablish(&sc->vmbus_intrhook);
 }
 
-#endif	/* EARLY_AP_STARTUP */
 
 static int
 vmbus_attach(device_t dev)
@@ -1690,7 +1689,7 @@ vmbus_attach(device_t dev)
 	vmbus_sc->vmbus_event_proc = vmbus_event_proc_dummy;
 	device_printf(dev,"vmbus_attach called\n");
 
-#ifdef EARLY_AP_STARTUP
+#if 1
 	/*
 	 * Defer the real attach until the pause(9) works as expected.
 	 */
@@ -1752,7 +1751,7 @@ vmbus_detach(device_t dev)
 	return (0);
 }
 
-#ifndef EARLY_AP_STARTUP
+#if 0
 
 static void
 vmbus_sysinit(void *arg __unused)
@@ -1777,5 +1776,4 @@ vmbus_sysinit(void *arg __unused)
  * initialized.
  */
 SYSINIT(vmbus_initialize, SI_SUB_SMP, SI_ORDER_ANY, vmbus_sysinit, NULL);
-
 #endif	/* !EARLY_AP_STARTUP */

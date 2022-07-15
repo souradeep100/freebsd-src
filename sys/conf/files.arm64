@@ -601,7 +601,6 @@ arm/xilinx/uart_dev_cdnc.c			optional uart soc_xilinx_zynq
 
 dev/hyperv/vmbus/hyperv.c				optional	hyperv
 dev/hyperv/vmbus/vmbus.c				optional	hyperv pci
-dev/hyperv/vmbus/vmbus_et.c				optional	hyperv
 dev/hyperv/vmbus/vmbus_if.m				optional	hyperv
 dev/hyperv/vmbus/vmbus_res.c				optional	hyperv
 dev/hyperv/vmbus/vmbus_xact.c				optional	hyperv
@@ -610,3 +609,8 @@ dev/hyperv/vmbus/vmbus_chan.c			optional 		hyperv
 dev/hyperv/vmbus/hyperv_busdma.c		optional hyperv
 dev/hyperv/vmbus/vmbus_br.c				optional 	hyperv
 dev/hyperv/storvsc/hv_storvsc_drv_freebsd.c optional hyperv
+dev/hyperv/utilities/vmbus_timesync.c                        optional        hyperv
+dev/hyperv/utilities/vmbus_heartbeat.c          optional    hyperv
+dev/hyperv/utilities/vmbus_ic.c             optional    hyperv
+dev/hyperv/utilities/vmbus_shutdown.c           optional    hyperv
+dev/hyperv/utilities/hv_kvp.c			optional   hyperv

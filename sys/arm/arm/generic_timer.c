@@ -300,7 +300,6 @@ arm_tmr_intr(void *arg)
 {
 	struct arm_tmr_softc *sc;
 	int ctrl;
-
 	sc = (struct arm_tmr_softc *)arg;
 	ctrl = get_ctrl(sc->physical);
 	if (ctrl & GT_CTRL_INT_STAT) {
@@ -310,7 +309,6 @@ arm_tmr_intr(void *arg)
 
 	if (sc->et.et_active)
 		sc->et.et_event_cb(&sc->et, sc->et.et_arg);
-
 	return (FILTER_HANDLED);
 }
 
@@ -348,7 +346,7 @@ arm_tmr_acpi_identify(driver_t *driver, device_t parent)
 	ACPI_TABLE_GTDT *gtdt;
 	vm_paddr_t physaddr;
 	device_t dev;
-
+	device_printf(parent, "arm_tmr_acpi_identify called\n");
 	physaddr = acpi_find_table(ACPI_SIG_GTDT);
 	if (physaddr == 0)
 		return;
@@ -369,7 +367,7 @@ arm_tmr_acpi_identify(driver_t *driver, device_t parent)
 	arm_tmr_acpi_add_irq(parent, dev, 0, gtdt->SecureEl1Interrupt);
 	arm_tmr_acpi_add_irq(parent, dev, 1, gtdt->NonSecureEl1Interrupt);
 	arm_tmr_acpi_add_irq(parent, dev, 2, gtdt->VirtualTimerInterrupt);
-
+	device_printf(parent, "arm_tmr_acpi_identify irq is setup\n");
 out:
 	acpi_unmap_table(gtdt);
 }
@@ -393,13 +391,14 @@ arm_tmr_attach(device_t dev)
 #endif
 	int error;
 	int i, first_timer, last_timer;
-
+	device_printf(dev, " arm_tmr_attach entered\n");
 	sc = device_get_softc(dev);
 	if (arm_tmr_sc)
 		return (ENXIO);
 
 	sc->get_cntxct = &get_cntxct;
 #ifdef FDT
+	device_printf(dev, " arm_tmr_attach ofw_bus_get_node getting called\n");
 	/* Get the base clock frequency */
 	node = ofw_bus_get_node(dev);
 	if (node > 0) {
@@ -421,7 +420,7 @@ arm_tmr_attach(device_t dev)
 		/* Try to get clock frequency from timer */
 		sc->clkfreq = get_freq();
 	}
-
+	device_printf(dev, " arm_tmr_attach sc->clkfreq %d\n",sc->clkfreq);
 	if (sc->clkfreq == 0) {
 		device_printf(dev, "No clock frequency specified\n");
 		return (ENXIO);
@@ -434,6 +433,7 @@ arm_tmr_attach(device_t dev)
 
 #ifdef __aarch64__
 	/* Use the virtual timer if we have one. */
+	 device_printf(dev, "arm_tmr_attach checking if virtual timer\n");
 	if (sc->res[2] != NULL) {
 		sc->physical = false;
 		first_timer = 2;
@@ -442,6 +442,7 @@ arm_tmr_attach(device_t dev)
 #endif
 	/* Otherwise set up the secure and non-secure physical timers. */
 	{
+		device_printf(dev, "arm_tmr_attach checking et up the secure and non-secure physical timers\n");
 		sc->physical = true;
 		first_timer = 0;
 		last_timer = 1;
@@ -454,6 +455,7 @@ arm_tmr_attach(device_t dev)
 		/* If we do not have the interrupt, skip it. */
 		if (sc->res[i] == NULL)
 			continue;
+		 device_printf(dev, "arm_tmr_attach setting up intr handler\n");
 		error = bus_setup_intr(dev, sc->res[i], INTR_TYPE_CLK,
 		    arm_tmr_intr, NULL, sc, &sc->ihl[i]);
 		if (error) {
@@ -463,12 +465,15 @@ arm_tmr_attach(device_t dev)
 	}
 
 	/* Disable the virtual timer until we are ready */
-	if (sc->res[2] != NULL)
+	if (sc->res[2] != NULL) {
+		device_printf(dev, "arm_tmr_attach disable virtual timer\n");
 		arm_tmr_disable(false);
+	}
 	/* And the physical */
-	if (sc->physical)
+	if (sc->physical) {
+		device_printf(dev, "arm_tmr_attach disable physical timer\n");
 		arm_tmr_disable(true);
-
+	}
 	arm_tmr_timecount.tc_frequency = sc->clkfreq;
 	tc_init(&arm_tmr_timecount);
 
@@ -483,11 +488,11 @@ arm_tmr_attach(device_t dev)
 	sc->et.et_stop = arm_tmr_stop;
 	sc->et.et_priv = sc;
 	et_register(&sc->et);
-
+	device_printf(dev, "arm_tmr_attach et setup\n");
 #if defined(__arm__)
 	arm_set_delay(arm_tmr_do_delay, sc);
 #endif
-
+	
 	return (0);
 }
 
