@@ -480,7 +480,7 @@ vmbus_chan_open_br(struct vmbus_channel *chan, const struct vmbus_chan_br *cbr,
 		vmbus_msghc_put(sc, mh);
 		goto failed;
 	}
-#if 0
+#if 1
 	for (;;) {
 		vmbus_chan_printf(chan,"calling vmbus_msghc_poll_result\n");
 		msg = vmbus_msghc_poll_result(sc, mh);
