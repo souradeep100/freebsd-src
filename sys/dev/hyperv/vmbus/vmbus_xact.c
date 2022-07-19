@@ -304,7 +304,9 @@ vmbus_xact_return(struct vmbus_xact *xact, size_t *resp_len)
 
 	resp = xact->x_resp;
 	*resp_len = xact->x_resp_len;
+#if 0
 	printf("vmbus_xact_return returning\n");
+#endif
 	return (resp);
 }
 
@@ -369,7 +371,6 @@ vmbus_xact_poll(struct vmbus_xact *xact, size_t *resp_len)
 	resp = vmbus_xact_return(xact, resp_len);
 
 	mtx_unlock(&ctx->xc_lock);
-	printf("vmbus_xact_poll returning \n");
 	return (resp);
 }
 

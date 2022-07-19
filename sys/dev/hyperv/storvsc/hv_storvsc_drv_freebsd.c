@@ -565,6 +565,12 @@ hv_storvsc_channel_init(struct storvsc_softc *sc)
 	}
 
 	max_subch = vstor_packet->u.chan_props.max_channel_cnt;
+
+#if 1
+	device_printf(sc->hs_dev,
+	    "hv_storvsc_channel_int,chk 40, mac_subch = %u\n", max_subch);
+#endif
+
 	if (hv_storvsc_chan_cnt > 0 && hv_storvsc_chan_cnt < (max_subch + 1))
 		max_subch = hv_storvsc_chan_cnt - 1;
 
@@ -874,6 +880,8 @@ hv_storvsc_on_channel_callback(struct vmbus_channel *channel, void *xsc)
 				hv_storvsc_rescan_target(sc);
 				break;
 			default:
+				printf("storvsc: on_chan_callback, unknown: 0x%x, bytes = %d\n",
+				    vstor_packet->operation, bytes_recvd);
 				break;
 			}			
 		}
@@ -1448,6 +1456,9 @@ storvsc_action(struct cam_sim *sim, union ccb *ccb)
 	int res;
 
 	mtx_assert(&sc->hs_lock, MA_OWNED);
+#if 0
+	printf("storvsc: receive action cmd = 0x%x\n", ccb->ccb_h.func_code);
+#endif
 	switch (ccb->ccb_h.func_code) {
 	case XPT_PATH_INQ: {
 		struct ccb_pathinq *cpi = &ccb->cpi;
@@ -1834,6 +1845,7 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 	for (i = 0; i < nsegs; i++) {
 #ifdef INVARIANTS
 		if (nsegs > 1) {
+#if 0
 			if (i == 0) {
 				KASSERT((segs[i].ds_addr & PAGE_MASK) +
 				    segs[i].ds_len == PAGE_SIZE,
@@ -1851,11 +1863,37 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 				     (uintmax_t)segs[i].ds_addr,
 				     segs[i].ds_len));
 			}
+#else
+			if (i == 0) {
+				;
+			} else if (i == nsegs - 1) {
+				KASSERT((segs[i].ds_addr & PAGE_MASK) == 0,
+				    ("invalid last page, ofs 0x%jx",
+				     (uintmax_t)segs[i].ds_addr));
+			} else {
+				KASSERT((segs[i].ds_addr & PAGE_MASK) == 0 &&
+				    segs[i].ds_len == PAGE_SIZE,
+				    ("not a full page, ofs 0x%jx, len %zu",
+				     (uintmax_t)segs[i].ds_addr,
+				     segs[i].ds_len));
+			}
+#endif
 		}
 #endif
 		prplist->gpa_page[i] = atop(segs[i].ds_addr);
 	}
 	reqp->prp_cnt = nsegs;
+
+	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
+		bus_dmasync_op_t op;
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
+			op = BUS_DMASYNC_PREREAD;
+		} else {
+			op = BUS_DMASYNC_PREWRITE;
+		}
+		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
+		    reqp->data_dmap, op);
+	}
 }
 
 /**
@@ -1949,6 +1987,12 @@ create_storvsc_request(union ccb *ccb, struct hv_storvsc_request *reqp)
 			    "bus_dmamap_load_ccb failed: %d\n", error);
 			return (error);
 		}
+#if 0
+		xpt_print(ccb->ccb_h.path,
+		    "CAM_DATA = 0x%x, bus_dmamap_sync() called\n",
+		    (ccb->ccb_h.flags & CAM_DATA_MASK));
+#endif
+
 		if ((ccb->ccb_h.flags & CAM_DATA_MASK) == CAM_DATA_BIO)
 			reqp->softc->sysctl_data.data_bio_cnt++;
 		else
@@ -2116,6 +2160,18 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 	int ori_sg_count = 0;
 	const struct scsi_generic *cmd;
 
+	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
+		bus_dmasync_op_t op;
+
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN)
+			op = BUS_DMASYNC_POSTREAD;
+		else
+			op = BUS_DMASYNC_POSTWRITE;
+
+		bus_dmamap_sync(sc->storvsc_req_dtag, reqp->data_dmap, op);
+		bus_dmamap_unload(sc->storvsc_req_dtag, reqp->data_dmap);
+	}
+
 	/* destroy bounce buffer if it is used */
 	if (reqp->bounce_sgl_count) {
 		ori_sglist = (bus_dma_segment_t *)ccb->csio.data_ptr;
@@ -2178,6 +2234,10 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 		hv_storvsc_srb_status = -1;
 	}
 #endif /* DIAGNOSTIC */
+#if 0
+	printf("storvsc: io_done, scsi_status: 0x%x, srb_status: 0x%x\n",
+	    vm_srb->scsi_status, srb_status);
+#endif
 	if (vm_srb->scsi_status == SCSI_STATUS_OK) {
 		if (srb_status != SRB_STATUS_SUCCESS) {
 			bool log_error = true;
@@ -2317,6 +2377,12 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 			resp_buf_len = resp_xfer_len >= 5 ? resp_buf[4] + 5 : 0;
 			data_len = (resp_buf_len < resp_xfer_len) ?
 			    resp_buf_len : resp_xfer_len;
+
+#if 1
+			xpt_print(ccb->ccb_h.path, "storvsc inquiry "
+			    "resp_xfer_len = %d, resp_buf_len = %d, data_len = %d\n",
+			    resp_xfer_len, resp_buf_len, data_len);
+#endif
 			if (bootverbose && data_len >= 5) {
 				xpt_print(ccb->ccb_h.path, "storvsc inquiry "
 				    "(%d) [%x %x %x %x %x ... ]\n", data_len,

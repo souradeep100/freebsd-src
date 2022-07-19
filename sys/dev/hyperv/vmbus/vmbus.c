@@ -255,7 +255,7 @@ vmbus_msghc_get(struct vmbus_softc *sc, size_t dsize)
 {
 	struct vmbus_msghc *mh;
 	struct vmbus_xact *xact;
-	device_printf(sc->vmbus_dev,"vmbus_msghc_get called\n");
+
 	if (dsize > HYPERCALL_POSTMSGIN_DSIZE_MAX)
 		panic("invalid data size %zu", dsize);
 
@@ -268,7 +268,6 @@ vmbus_msghc_get(struct vmbus_softc *sc, size_t dsize)
 	mh->mh_xact = xact;
 
 	vmbus_msghc_reset(mh, dsize);
-	device_printf(sc->vmbus_dev,"vmbus_msghc_get returning\n");
 	return (mh);
 }
 
@@ -320,7 +319,9 @@ vmbus_msghc_exec_noresult(struct vmbus_msghc *mh)
 		uint64_t status;
 
 		status = hypercall_post_message(inprm_paddr);
+#if 0
 		printf("vmbus_msghc_exec_noresult hypercall_post_message status %lu\n",status);
+#endif
 		if (status == HYPERCALL_STATUS_SUCCESS)
 			return 0;
 
@@ -638,7 +639,9 @@ vmbus_chanmsg_handle(struct vmbus_softc *sc, const struct vmbus_message *msg)
 
 	/* Channel specific processing */
 	vmbus_chan_msgproc(sc, msg);
+#if 0
 	device_printf(sc->vmbus_dev,"returned from vmbus_chanmsg_handle vmbus_chan_msgproc\n");
+#endif
 }
 
 static void
@@ -687,7 +690,9 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	volatile struct vmbus_message *msg;
 	struct vmbus_message *msg_base;
 
+#if 0
 	device_printf(sc->vmbus_dev,"vmbus_handle_intr1 inside\n");
+#endif
 	msg_base = VMBUS_PCPU_GET(sc, message, cpu);
 	/*
 	 * Check event timer.
@@ -696,7 +701,6 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	 */
 #if 0
 	msg = msg_base + VMBUS_SINT_TIMER;
-	device_printf(sc->vmbus_dev,"vmbus_handle_intr1 msg_base\n");
 	if (msg->msg_type == HYPERV_MSGTYPE_TIMER_EXPIRED) {
 		msg->msg_type = HYPERV_MSGTYPE_NONE;
 
@@ -732,18 +736,21 @@ vmbus_handle_intr1(struct vmbus_softc *sc, struct trapframe *frame, int cpu)
 	 * As recommended by the Windows guest fellows, we check events before
 	 * checking messages.
 	 */
-	device_printf(sc->vmbus_dev,"mbus_event_proc called\n");
 	sc->vmbus_event_proc(sc, cpu);
 
 	/*
 	 * Check messages.  Mainly management stuffs; ultra low rate.
 	 */
 	msg = msg_base + VMBUS_SINT_MESSAGE;
+#if 0
 	device_printf(sc->vmbus_dev, "vmbus_handle_intr1 msg_type 0x%x and msg flag 0x%x\n",msg->msg_type, msg->msg_flags);
+#endif
 	if (__predict_false(msg->msg_type != HYPERV_MSGTYPE_NONE)) {
 		taskqueue_enqueue(VMBUS_PCPU_GET(sc, message_tq, cpu),
 		    VMBUS_PCPU_PTR(sc, message_task, cpu));
+#if 0
 			device_printf(sc->vmbus_dev,"VMBUS_SINT_MESSAGE\n");
+#endif
 	}
 
 	return (FILTER_HANDLED);
@@ -763,8 +770,6 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 	/*
 	 * Disable preemption.
 	 */
-	printf("vmbus_dev vmbus_handle_intr inside\n");
-
 	critical_enter();
 
 	/*
