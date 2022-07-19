@@ -614,3 +614,6 @@ dev/hyperv/utilities/vmbus_heartbeat.c          optional    hyperv
 dev/hyperv/utilities/vmbus_ic.c             optional    hyperv
 dev/hyperv/utilities/vmbus_shutdown.c           optional    hyperv
 dev/hyperv/utilities/hv_kvp.c			optional   hyperv
+dev/hyperv/netvsc/hn_nvs.c				optional	hyperv
+dev/hyperv/netvsc/hn_rndis.c				optional	hyperv
+dev/hyperv/netvsc/if_hn.c				optional	hyperv
