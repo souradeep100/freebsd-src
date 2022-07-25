@@ -63,9 +63,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcib_private.h>
 #include "pcib_if.h"
 
-#include <machine/intr_machdep.h>
+/*#include <machine/intr_machdep.h>
 #include <x86/apicreg.h>
-
+*/
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/hyperv/include/vmbus_xact.h>

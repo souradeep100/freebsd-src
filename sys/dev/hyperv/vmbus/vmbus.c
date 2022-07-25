@@ -140,9 +140,6 @@ static int			vmbus_handle_intr_new(void *);
 static struct vmbus_softc	*vmbus_sc;
 static void			arm_hv_set_reg(u_int, uint64_t);
 
-#if 0
-#define WRMSR(msr, value) WRMSR(msr, value)
-#endif
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "Hyper-V vmbus");
@@ -1287,7 +1284,6 @@ vmbus_get_eventtq_method(device_t bus, device_t dev __unused, int cpu)
 	return (VMBUS_PCPU_GET(sc, event_tq, cpu));
 }
 
-#if 0
 #define VTPM_BASE_ADDR 0xfed40000
 #define FOUR_GB (1ULL << 32)
 
@@ -1434,7 +1430,7 @@ static void
 vmbus_fb_mmio_res(device_t dev)
 {
 	struct efi_fb *efifb;
-	struct vbe_fb *vbefb;
+	//struct vbe_fb *vbefb;
 	rman_res_t fb_start, fb_end, fb_count;
 	int fb_height, fb_width;
 	caddr_t kmdp;
@@ -1447,20 +1443,14 @@ vmbus_fb_mmio_res(device_t dev)
 		kmdp = preload_search_by_type("elf64 kernel");
 	efifb = (struct efi_fb *)preload_search_info(kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_FB);
-	vbefb = (struct vbe_fb *)preload_search_info(kmdp,
-	    MODINFO_METADATA | MODINFOMD_VBE_FB);
+	//vbefb = (struct vbe_fb *)preload_search_info(kmdp,
+	//    MODINFO_METADATA | MODINFOMD_VBE_FB);
 	if (efifb != NULL) {
 		fb_start = efifb->fb_addr;
 		fb_end = efifb->fb_addr + efifb->fb_size;
 		fb_count = efifb->fb_size;
 		fb_height = efifb->fb_height;
 		fb_width = efifb->fb_width;
-	} else if (vbefb != NULL) {
-		fb_start = vbefb->fb_addr;
-		fb_end = vbefb->fb_addr + vbefb->fb_size;
-		fb_count = vbefb->fb_size;
-		fb_height = vbefb->fb_height;
-		fb_width = vbefb->fb_width;
 	} else {
 		if (bootverbose)
 			device_printf(dev,
@@ -1496,7 +1486,6 @@ vmbus_free_mmio_res(device_t dev)
 	if (hv_fb_res)
 		hv_fb_res = NULL;
 }
-#endif	/* NEW_PCIB */
 
 static void
 vmbus_identify(driver_t *driver, device_t parent)
@@ -1544,36 +1533,8 @@ vmbus_doattach(struct vmbus_softc *sc)
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);
 
-#if 0
 	vmbus_get_mmio_res(sc->vmbus_dev);
 	vmbus_fb_mmio_res(sc->vmbus_dev);
-#endif
-#if 0 /*XXX weh*/
-	int vector = 0;
-	struct resource *res;
-	void *cookiep;
-	res = bus_alloc_resource_any(device_get_parent(sc->vmbus_dev),
-				SYS_RES_IRQ, &vector, RF_ACTIVE | RF_SHAREABLE);
-	if (res == NULL) {
-		device_printf(sc->vmbus_dev,
-			"bus_alloc_resouce_any failed\n");
-		return (ENXIO);
-	} else {
-		device_printf(sc->vmbus_dev,
-			"irq %ju, vector %d\n",
-		rman_get_start(res), vector);
-	}
-	int err;
-	err = bus_setup_intr(sc->vmbus_dev, res, INTR_TYPE_NET | INTR_MPSAFE,
-							NULL,  vmbus_handle_intr_new, sc, &cookiep);
-	if (err) {
-		device_printf(sc-vmbus_dev, "failed to setup IRQ\n");
-		return (err);
-	}
-	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
-
-	
-#endif
 
 	sc->vmbus_flags |= VMBUS_FLAG_ATTACHED;
 
@@ -1749,9 +1710,7 @@ vmbus_detach(device_t dev)
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
-#if 0
 	vmbus_free_mmio_res(dev);
-#endif
 
 	return (0);
 }

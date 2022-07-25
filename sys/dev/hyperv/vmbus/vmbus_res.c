@@ -39,10 +39,21 @@ __FBSDID("$FreeBSD$");
 
 #include "acpi_if.h"
 #include "bus_if.h"
+#include "pcib_if.h"
 
 static int		vmbus_res_probe(device_t);
 static int		vmbus_res_attach(device_t);
 static int		vmbus_res_detach(device_t);
+static int          acpi_syscont_alloc_msi(device_t, device_t,
+                    int count, int maxcount, int *irqs);
+static int          acpi_syscont_release_msi(device_t bus, device_t dev,
+                    int count, int *irqs);
+static int          acpi_syscont_alloc_msix(device_t bus, device_t dev,
+                    int *irq);
+static int          acpi_syscont_release_msix(device_t bus, device_t dev,
+                    int irq);
+static int          acpi_syscont_map_msi(device_t bus, device_t dev,
+                    int irq, uint64_t *addr, uint32_t *data);
 
 static device_method_t vmbus_res_methods[] = {
 	/* Device interface */
@@ -54,6 +65,12 @@ static device_method_t vmbus_res_methods[] = {
 	DEVMETHOD(device_resume,		bus_generic_resume),
 	DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
 	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+    /* pcib interface */
+    DEVMETHOD(pcib_alloc_msi,       acpi_syscont_alloc_msi),
+    DEVMETHOD(pcib_release_msi,     acpi_syscont_release_msi),
+    DEVMETHOD(pcib_alloc_msix,      acpi_syscont_alloc_msix),
+    DEVMETHOD(pcib_release_msix,    acpi_syscont_release_msix),
+    DEVMETHOD(pcib_map_msi,     acpi_syscont_map_msi),
 	DEVMETHOD_END
 };
 
@@ -97,4 +114,47 @@ vmbus_res_detach(device_t dev __unused)
 {
 
 	return (0);
+}
+
+static int
+acpi_syscont_alloc_msi(device_t bus, device_t dev, int count, int maxcount,
+    int *irqs)
+{
+    device_t parent = device_get_parent(bus);
+
+    return (PCIB_ALLOC_MSI(device_get_parent(parent), dev, count, maxcount,
+    irqs));
+}
+
+static int
+acpi_syscont_release_msi(device_t bus, device_t dev, int count, int *irqs)
+{
+    device_t parent = device_get_parent(bus);
+
+    return (PCIB_RELEASE_MSI(device_get_parent(parent), dev, count, irqs));
+}
+
+static int
+acpi_syscont_alloc_msix(device_t bus, device_t dev, int *irq)
+{
+    device_t parent = device_get_parent(bus);
+
+    return (PCIB_ALLOC_MSIX(device_get_parent(parent), dev, irq));
+}
+
+static int
+acpi_syscont_release_msix(device_t bus, device_t dev, int irq)
+{
+    device_t parent = device_get_parent(bus);
+
+    return (PCIB_RELEASE_MSIX(device_get_parent(parent), dev, irq));
+}
+
+static int
+acpi_syscont_map_msi(device_t bus, device_t dev, int irq, uint64_t *addr,
+    uint32_t *data)
+{
+    device_t parent = device_get_parent(bus);
+
+    return (PCIB_MAP_MSI(device_get_parent(parent), dev, irq, addr, data));
 }
