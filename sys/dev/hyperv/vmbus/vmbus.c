@@ -784,6 +784,8 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 #define HV_REGISTER_SIMP        0x000A0013
 #define HV_REGISTER_SIEFP       0x000A0012
 #define HV_REGISTER_SCONTROL        0x000A0010
+#define  HV_REGISTER_VP_INDEX 0x00090003
+ #define HV_REGISTER_SIEFP 0x000A0012
 static void
 vmbus_synic_setup(void *xsc)
 {
@@ -794,7 +796,7 @@ vmbus_synic_setup(void *xsc)
 	device_printf(sc->vmbus_dev,"inside vmbus_synic_setup\n");
 	if (hyperv_features & CPUID_HV_MSR_VP_INDEX) {
 		/* Save virtual processor id. */
-		VMBUS_PCPU_GET(sc, vcpuid, cpu) = RDMSR(MSR_HV_VP_INDEX);
+		VMBUS_PCPU_GET(sc, vcpuid, cpu) = RDMSR(HV_REGISTER_VP_INDEX);
 	} else {
 		/* Set virtual processor id to 0 for compatibility. */
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
@@ -803,20 +805,23 @@ vmbus_synic_setup(void *xsc)
 	/*
 	 * Setup the SynIC message.
 	 */
-	orig = RDMSR(MSR_HV_SIMP);
+	orig = RDMSR(HV_REGISTER_SIMP);
+	device_printf(sc->vmbus_dev,"RDMSR(HV_REGISTER_SIMP) 0x%lx\n", orig);
 	val = MSR_HV_SIMP_ENABLE | (orig & MSR_HV_SIMP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, message_dma.hv_paddr, cpu) >> PAGE_SHIFT) <<
 	     MSR_HV_SIMP_PGSHIFT);
 	WRMSR(HV_REGISTER_SIMP, val);
-
+	orig = RDMSR(HV_REGISTER_SIMP);
+	device_printf(sc->vmbus_dev,"after WRMSR of val 0x%lx RDMSR(HV_REGISTER_SIMP) 0x%lx\n", val, orig);
 	/*
 	 * Setup the SynIC event flags.
 	 */
 	device_printf(sc->vmbus_dev,"before  RDMSR MSR_HV_SIEFP\n");
-	orig = RDMSR(MSR_HV_SIEFP);
+	orig = RDMSR(HV_REGISTER_SIEFP);
 	val = MSR_HV_SIEFP_ENABLE | (orig & MSR_HV_SIEFP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, event_flags_dma.hv_paddr, cpu)
 	      >> PAGE_SHIFT) << MSR_HV_SIEFP_PGSHIFT);
+	device_printf(sc->vmbus_dev,"HV_REGISTER_SIEFP val 0x%lx\n",val);
 	WRMSR(HV_REGISTER_SIEFP, val);
 
 
@@ -845,7 +850,7 @@ vmbus_synic_setup(void *xsc)
 	 * All done; enable SynIC.
 	 */
 	device_printf(sc->vmbus_dev,"before synic enabled\n");
-	orig = RDMSR(MSR_HV_SCONTROL);
+	orig = RDMSR(HV_REGISTER_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(HV_REGISTER_SCONTROL, val);
 	device_printf(sc->vmbus_dev,"synic enabled\n");
@@ -860,8 +865,8 @@ vmbus_synic_teardown(void *arg)
 	/*
 	 * Disable SynIC.
 	 */
-	orig = RDMSR(MSR_HV_SCONTROL);
-	WRMSR(MSR_HV_SCONTROL, (orig & MSR_HV_SCTRL_RSVD_MASK));
+	orig = RDMSR(HV_REGISTER_SCONTROL);
+	WRMSR(HV_REGISTER_SCONTROL, (orig & MSR_HV_SCTRL_RSVD_MASK));
 
 	/*
 	 * Mask message and event flags SINT.
@@ -881,14 +886,14 @@ vmbus_synic_teardown(void *arg)
 	/*
 	 * Teardown SynIC message.
 	 */
-	orig = RDMSR(MSR_HV_SIMP);
-	WRMSR(MSR_HV_SIMP, (orig & MSR_HV_SIMP_RSVD_MASK));
+	orig = RDMSR(HV_REGISTER_SIMP);
+	WRMSR(HV_REGISTER_SIMP, (orig & MSR_HV_SIMP_RSVD_MASK));
 
 	/*
 	 * Teardown SynIC event flags.
 	 */
-	orig = RDMSR(MSR_HV_SIEFP);
-	WRMSR(MSR_HV_SIEFP, (orig & MSR_HV_SIEFP_RSVD_MASK));
+	orig = RDMSR(HV_REGISTER_SIEFP);
+	WRMSR(HV_REGISTER_SIEFP, (orig & MSR_HV_SIEFP_RSVD_MASK));
 }
 
 static int

@@ -86,7 +86,7 @@ static u_int			hyperv_pm_features;
 static u_int			hyperv_features3;
 #endif
 hyperv_tc64_t			hyperv_tc64;
-
+#if 0
 static struct timecounter	hyperv_timecounter = {
 	.tc_get_timecount	= hyperv_get_timecount,
 	.tc_poll_pps		= NULL,
@@ -97,7 +97,7 @@ static struct timecounter	hyperv_timecounter = {
 	.tc_flags		= 0,
 	.tc_priv		= NULL
 };
-
+#endif
 static struct hypercall_ctx	hypercall_context;
 
 static u_int
@@ -251,6 +251,7 @@ hyperv_init(void *dummy __unused)
 	/* Set guest id */
 	WRMSR(HV_REGISTER_GUEST_OSID, MSR_HV_GUESTID_FREEBSD);
 	printf("Hyper-V WRMSR done\n");
+#if 0
 	if (hyperv_features & CPUID_HV_MSR_TIME_REFCNT) {
 		/*
 		 * Register Hyper-V timecounter.  This should be done as early
@@ -266,6 +267,7 @@ hyperv_init(void *dummy __unused)
 		hyperv_tc64 = hyperv_tc64_RDMSR;
 		printf("Hyper-V crashing here\n");
 	}
+#endif
 }
 SYSINIT(hyperv_initialize, SI_SUB_HYPERVISOR, SI_ORDER_FIRST, hyperv_init,
     NULL);
@@ -280,7 +282,6 @@ hypercall_memfree(void)
 static void
 hypercall_create(void *arg __unused)
 {
-	uint64_t hc, hc_orig;
 
 	if (vm_guest != VM_GUEST_HV)
 		return;
@@ -296,6 +297,7 @@ hypercall_create(void *arg __unused)
 	hypercall_context.hc_paddr = vtophys(hypercall_context.hc_addr);
 
 	/* Get the 'reserved' bits, which requires preservation. */
+#if 0
 	hc_orig = RDMSR(MSR_HV_HYPERCALL);
 
 	/*
@@ -313,6 +315,7 @@ hypercall_create(void *arg __unused)
 	 * Confirm that Hypercall page did get setup.
 	 */
 	hc = RDMSR(MSR_HV_HYPERCALL);
+	printf("hyperv MSR_HV_HYPERCALL rdmsr is %ul\n",hc);
 	hc = MSR_HV_HYPERCALL_ENABLE;
 	if ((hc & MSR_HV_HYPERCALL_ENABLE) == 0) {
 		printf("hyperv: Hypercall setup failed\n");
@@ -321,6 +324,7 @@ hypercall_create(void *arg __unused)
 		vm_guest = VM_GUEST_VM;
 		return;
 	}
+#endif
 	if (bootverbose)
 		printf("hyperv: Hypercall created\n");
 }
@@ -329,16 +333,17 @@ SYSINIT(hypercall_ctor, SI_SUB_DRIVERS, SI_ORDER_FIRST, hypercall_create, NULL);
 static void
 hypercall_destroy(void *arg __unused)
 {
-	uint64_t hc;
 
 	if (hypercall_context.hc_addr == NULL)
 		return;
-
+#if 0
 	/* Disable Hypercall */
 	hc = RDMSR(MSR_HV_HYPERCALL);
 	WRMSR(MSR_HV_HYPERCALL, (hc & MSR_HV_HYPERCALL_RSVD_MASK));
 	hypercall_memfree();
+#endif
 
+	hypercall_memfree();
 	if (bootverbose)
 		printf("hyperv: Hypercall destroyed\n");
 }
