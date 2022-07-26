@@ -140,9 +140,6 @@ static int			vmbus_handle_intr_new(void *);
 static struct vmbus_softc	*vmbus_sc;
 static void			arm_hv_set_reg(u_int, uint64_t);
 
-#if 0
-#define WRMSR(msr, value) WRMSR(msr, value)
-#endif
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "Hyper-V vmbus");
@@ -787,6 +784,8 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 #define HV_REGISTER_SIMP        0x000A0013
 #define HV_REGISTER_SIEFP       0x000A0012
 #define HV_REGISTER_SCONTROL        0x000A0010
+#define  HV_REGISTER_VP_INDEX 0x00090003
+ #define HV_REGISTER_SIEFP 0x000A0012
 static void
 vmbus_synic_setup(void *xsc)
 {
@@ -797,7 +796,7 @@ vmbus_synic_setup(void *xsc)
 	device_printf(sc->vmbus_dev,"inside vmbus_synic_setup\n");
 	if (hyperv_features & CPUID_HV_MSR_VP_INDEX) {
 		/* Save virtual processor id. */
-		VMBUS_PCPU_GET(sc, vcpuid, cpu) = RDMSR(MSR_HV_VP_INDEX);
+		VMBUS_PCPU_GET(sc, vcpuid, cpu) = RDMSR(HV_REGISTER_VP_INDEX);
 	} else {
 		/* Set virtual processor id to 0 for compatibility. */
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
@@ -806,20 +805,23 @@ vmbus_synic_setup(void *xsc)
 	/*
 	 * Setup the SynIC message.
 	 */
-	orig = RDMSR(MSR_HV_SIMP);
+	orig = RDMSR(HV_REGISTER_SIMP);
+	device_printf(sc->vmbus_dev,"RDMSR(HV_REGISTER_SIMP) 0x%lx\n", orig);
 	val = MSR_HV_SIMP_ENABLE | (orig & MSR_HV_SIMP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, message_dma.hv_paddr, cpu) >> PAGE_SHIFT) <<
 	     MSR_HV_SIMP_PGSHIFT);
 	WRMSR(HV_REGISTER_SIMP, val);
-
+	orig = RDMSR(HV_REGISTER_SIMP);
+	device_printf(sc->vmbus_dev,"after WRMSR of val 0x%lx RDMSR(HV_REGISTER_SIMP) 0x%lx\n", val, orig);
 	/*
 	 * Setup the SynIC event flags.
 	 */
 	device_printf(sc->vmbus_dev,"before  RDMSR MSR_HV_SIEFP\n");
-	orig = RDMSR(MSR_HV_SIEFP);
+	orig = RDMSR(HV_REGISTER_SIEFP);
 	val = MSR_HV_SIEFP_ENABLE | (orig & MSR_HV_SIEFP_RSVD_MASK) |
 	    ((VMBUS_PCPU_GET(sc, event_flags_dma.hv_paddr, cpu)
 	      >> PAGE_SHIFT) << MSR_HV_SIEFP_PGSHIFT);
+	device_printf(sc->vmbus_dev,"HV_REGISTER_SIEFP val 0x%lx\n",val);
 	WRMSR(HV_REGISTER_SIEFP, val);
 
 
@@ -848,7 +850,7 @@ vmbus_synic_setup(void *xsc)
 	 * All done; enable SynIC.
 	 */
 	device_printf(sc->vmbus_dev,"before synic enabled\n");
-	orig = RDMSR(MSR_HV_SCONTROL);
+	orig = RDMSR(HV_REGISTER_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(HV_REGISTER_SCONTROL, val);
 	device_printf(sc->vmbus_dev,"synic enabled\n");
@@ -863,8 +865,8 @@ vmbus_synic_teardown(void *arg)
 	/*
 	 * Disable SynIC.
 	 */
-	orig = RDMSR(MSR_HV_SCONTROL);
-	WRMSR(MSR_HV_SCONTROL, (orig & MSR_HV_SCTRL_RSVD_MASK));
+	orig = RDMSR(HV_REGISTER_SCONTROL);
+	WRMSR(HV_REGISTER_SCONTROL, (orig & MSR_HV_SCTRL_RSVD_MASK));
 
 	/*
 	 * Mask message and event flags SINT.
@@ -884,14 +886,14 @@ vmbus_synic_teardown(void *arg)
 	/*
 	 * Teardown SynIC message.
 	 */
-	orig = RDMSR(MSR_HV_SIMP);
-	WRMSR(MSR_HV_SIMP, (orig & MSR_HV_SIMP_RSVD_MASK));
+	orig = RDMSR(HV_REGISTER_SIMP);
+	WRMSR(HV_REGISTER_SIMP, (orig & MSR_HV_SIMP_RSVD_MASK));
 
 	/*
 	 * Teardown SynIC event flags.
 	 */
-	orig = RDMSR(MSR_HV_SIEFP);
-	WRMSR(MSR_HV_SIEFP, (orig & MSR_HV_SIEFP_RSVD_MASK));
+	orig = RDMSR(HV_REGISTER_SIEFP);
+	WRMSR(HV_REGISTER_SIEFP, (orig & MSR_HV_SIEFP_RSVD_MASK));
 }
 
 static int
@@ -1287,7 +1289,6 @@ vmbus_get_eventtq_method(device_t bus, device_t dev __unused, int cpu)
 	return (VMBUS_PCPU_GET(sc, event_tq, cpu));
 }
 
-#if 0
 #define VTPM_BASE_ADDR 0xfed40000
 #define FOUR_GB (1ULL << 32)
 
@@ -1434,7 +1435,7 @@ static void
 vmbus_fb_mmio_res(device_t dev)
 {
 	struct efi_fb *efifb;
-	struct vbe_fb *vbefb;
+	//struct vbe_fb *vbefb;
 	rman_res_t fb_start, fb_end, fb_count;
 	int fb_height, fb_width;
 	caddr_t kmdp;
@@ -1447,20 +1448,14 @@ vmbus_fb_mmio_res(device_t dev)
 		kmdp = preload_search_by_type("elf64 kernel");
 	efifb = (struct efi_fb *)preload_search_info(kmdp,
 	    MODINFO_METADATA | MODINFOMD_EFI_FB);
-	vbefb = (struct vbe_fb *)preload_search_info(kmdp,
-	    MODINFO_METADATA | MODINFOMD_VBE_FB);
+	//vbefb = (struct vbe_fb *)preload_search_info(kmdp,
+	//    MODINFO_METADATA | MODINFOMD_VBE_FB);
 	if (efifb != NULL) {
 		fb_start = efifb->fb_addr;
 		fb_end = efifb->fb_addr + efifb->fb_size;
 		fb_count = efifb->fb_size;
 		fb_height = efifb->fb_height;
 		fb_width = efifb->fb_width;
-	} else if (vbefb != NULL) {
-		fb_start = vbefb->fb_addr;
-		fb_end = vbefb->fb_addr + vbefb->fb_size;
-		fb_count = vbefb->fb_size;
-		fb_height = vbefb->fb_height;
-		fb_width = vbefb->fb_width;
 	} else {
 		if (bootverbose)
 			device_printf(dev,
@@ -1496,7 +1491,6 @@ vmbus_free_mmio_res(device_t dev)
 	if (hv_fb_res)
 		hv_fb_res = NULL;
 }
-#endif	/* NEW_PCIB */
 
 static void
 vmbus_identify(driver_t *driver, device_t parent)
@@ -1544,36 +1538,8 @@ vmbus_doattach(struct vmbus_softc *sc)
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);
 
-#if 0
 	vmbus_get_mmio_res(sc->vmbus_dev);
 	vmbus_fb_mmio_res(sc->vmbus_dev);
-#endif
-#if 0 /*XXX weh*/
-	int vector = 0;
-	struct resource *res;
-	void *cookiep;
-	res = bus_alloc_resource_any(device_get_parent(sc->vmbus_dev),
-				SYS_RES_IRQ, &vector, RF_ACTIVE | RF_SHAREABLE);
-	if (res == NULL) {
-		device_printf(sc->vmbus_dev,
-			"bus_alloc_resouce_any failed\n");
-		return (ENXIO);
-	} else {
-		device_printf(sc->vmbus_dev,
-			"irq %ju, vector %d\n",
-		rman_get_start(res), vector);
-	}
-	int err;
-	err = bus_setup_intr(sc->vmbus_dev, res, INTR_TYPE_NET | INTR_MPSAFE,
-							NULL,  vmbus_handle_intr_new, sc, &cookiep);
-	if (err) {
-		device_printf(sc-vmbus_dev, "failed to setup IRQ\n");
-		return (err);
-	}
-	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
-
-	
-#endif
 
 	sc->vmbus_flags |= VMBUS_FLAG_ATTACHED;
 
@@ -1749,9 +1715,7 @@ vmbus_detach(device_t dev)
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
-#if 0
 	vmbus_free_mmio_res(dev);
-#endif
 
 	return (0);
 }
