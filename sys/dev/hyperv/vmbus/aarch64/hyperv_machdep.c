@@ -63,20 +63,7 @@ __FBSDID("$FreeBSD$");
 #define HV_FUNC_ID SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,    \
     SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER))
 
-struct hv_get_vp_registers_output {
-    union {
-        struct {
-            u32 a;
-            u32 b;
-            u32 c;
-            u32 d;
-        } as32 __packed;
-        struct {
-            u64 low;
-            u64 high;
-        } as64 __packed;
-    };
-};
+
 void arm_hv_set_vreg(u32, u64);
 void hv_get_vpreg_128(u32 , struct hv_get_vp_registers_output *);
 u64 arm_hv_get_vreg(u32 msr); 

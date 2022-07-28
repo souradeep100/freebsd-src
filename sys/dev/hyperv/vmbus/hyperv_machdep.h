@@ -36,6 +36,22 @@ uint64_t	hypercall_md(volatile void *hc_addr, uint64_t in_val,
 #if 1
 typedef uint32_t u32;
 typedef uint64_t u64;
+struct hv_get_vp_registers_output {
+    union {
+        struct {
+            u32 a;
+            u32 b;
+            u32 c;
+            u32 d;
+        } as32 __packed;
+        struct {
+            u64 low;
+            u64 high;
+        } as64 __packed;
+    };
+};
+
+void hv_get_vpreg_128(u32 , struct hv_get_vp_registers_output *);
 void arm_hv_set_vreg(u32 msr, u64 val);
 #define WRMSR(msr, val) arm_hv_set_vreg(msr, val)
 u64 arm_hv_get_vreg(u32 msr);

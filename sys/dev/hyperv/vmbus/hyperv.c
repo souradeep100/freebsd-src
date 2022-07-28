@@ -139,12 +139,20 @@ hyperv_guid2str(const struct hyperv_guid *guid, char *buf, size_t sz)
 	    d[5], d[4], d[7], d[6], d[8], d[9],
 	    d[10], d[11], d[12], d[13], d[14], d[15]);
 }
-
+#define HV_REGISTER_HYPERVISOR_VERSION      0x00000100 /*CPUID 0x40000002 */
+#define HV_REGISTER_FEATURES            0x00000200 /*CPUID 0x40000003 */
+#define HV_REGISTER_ENLIGHTENMENTS      0x00000201 /*CPUID 0x40000004 */
 static bool
 hyperv_identify(void)
 {
+	struct hv_get_vp_registers_output   result;
 	printf("Hyper-V identify\n");
 	vm_guest = VM_GUEST_HV;
+
+	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
+	hyperv_features = result.as32.a;
+	hv_get_vpreg_128(HV_REGISTER_HYPERVISOR_VERSION, &result);
+	hyperv_ver_major = result.as32.b >> 16;
 #if 0
 	u_int regs[4];
 	unsigned int maxleaf;
