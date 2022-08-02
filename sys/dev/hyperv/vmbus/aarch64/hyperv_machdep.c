@@ -36,9 +36,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/vdso.h>
 
 #include <machine/cpufunc.h>
-#if 0
-#include <machine/cputypes.h>
-#endif
 #include <machine/md_var.h>
 
 #include <vm/vm.h>
@@ -85,12 +82,6 @@ void arm_hv_set_vreg(u32 msr, u64 value)
         value,
         0,
         &res);
-
-    /*
-     * Something is fundamentally broken in the hypervisor if
-     * setting a VP register fails. There's really no way to
-     * continue as a guest VM, so panic.
-     */
 }
 
 
@@ -113,12 +104,6 @@ void hv_get_vpreg_128(u32 msr, struct hv_get_vp_registers_output *result)
      */
     arm_smccc_1_2_hvc(&args, &res);
 
-    /*
-     * Something is fundamentally broken in the hypervisor if
-     * getting a VP register fails. There's really no way to
-     * continue as a guest VM, so panic.
-     */
-	printf("hv_get_vpreg_128 res.a6 0x%lx res.a7 0x%lx and res.a0 0x%lx\n",res.a6, res.a7, res.a0);
     result->as64.low = res.a6;
     result->as64.high = res.a7;
 }
@@ -136,23 +121,19 @@ uint64_t
 hypercall_md(volatile void *hc_addr, uint64_t in_val,
     uint64_t in_paddr, uint64_t out_paddr)
 {
-	/* need to implement */
 	struct arm_smccc_res res;
-#if 0
-	printf("inside hypercall_md\n");
-#endif
 	int64_t hv_func_id;
 	hv_func_id = SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,
 							SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER));
-    arm_smccc_hvc (hv_func_id,
-        in_val,
-        in_paddr,
-        out_paddr,
-        0,
-        0,
-        0,
-        0,
-        &res);
+	arm_smccc_hvc (hv_func_id,
+		in_val,
+		in_paddr,
+		out_paddr,
+		0,
+		0,
+		0,
+		0,
+		&res);
 
 	return (res.a0);
 }

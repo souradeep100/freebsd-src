@@ -151,6 +151,9 @@ struct vmbus_msghc;
 void		vmbus_handle_intr(struct trapframe *);
 int		vmbus_add_child(struct vmbus_channel *);
 int		vmbus_delete_child(struct vmbus_channel *);
+#if !defined(__aarch64__)
+void		vmbus_et_intr(struct trapframe *);
+#endif
 uint32_t	vmbus_gpadl_alloc(struct vmbus_softc *);
 
 struct vmbus_msghc *

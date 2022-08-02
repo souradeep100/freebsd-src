@@ -88,8 +88,10 @@ extern struct console spinconsole;
 
 struct console *consoles[] = {
 	&efi_console,
-#if defined(__amd64__) || defined(__i386__)
+#if defined(__aarch64_hyperv__)
 	&comconsole,
+#endif
+#if defined(__amd64__) || defined(__i386__)
 	&nullconsole,
 	&spinconsole,
 #endif

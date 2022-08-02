@@ -19,15 +19,6 @@
 
 cpu		ARM64
 ident		GENERIC
-makeoptions DEBUG=-g
-options     KDB         # Enable kernel debugger support.
-options     KDB_TRACE       # Print a stack trace for a panic.
-# For full debugger support use (turn off in stable branch):
-options     BUF_TRACKING        # Track buffer history
-options     DDB         # Support DDB.
-options     FULL_BUF_TRACKING   # Track more buffer history
-options     GDB         # Support remote GDB.
-options     VERBOSE_SYSINIT=0
 
 include		"std.arm64"
 include		"std.dev"

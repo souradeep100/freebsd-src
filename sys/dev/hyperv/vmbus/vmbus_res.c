@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 static int		vmbus_res_probe(device_t);
 static int		vmbus_res_attach(device_t);
 static int		vmbus_res_detach(device_t);
+#if defined(__aarch64__)
 static int          acpi_syscont_alloc_msi(device_t, device_t,
                     int count, int maxcount, int *irqs);
 static int          acpi_syscont_release_msi(device_t bus, device_t dev,
@@ -54,6 +55,7 @@ static int          acpi_syscont_release_msix(device_t bus, device_t dev,
                     int irq);
 static int          acpi_syscont_map_msi(device_t bus, device_t dev,
                     int irq, uint64_t *addr, uint32_t *data);
+#endif /* aarch64 */
 
 static device_method_t vmbus_res_methods[] = {
 	/* Device interface */
@@ -63,6 +65,7 @@ static device_method_t vmbus_res_methods[] = {
 	DEVMETHOD(device_shutdown,		bus_generic_shutdown),
 	DEVMETHOD(device_suspend,		bus_generic_suspend),
 	DEVMETHOD(device_resume,		bus_generic_resume),
+#if defined(__aarch64__)
 	DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
 	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
     /* pcib interface */
@@ -71,6 +74,7 @@ static device_method_t vmbus_res_methods[] = {
     DEVMETHOD(pcib_alloc_msix,      acpi_syscont_alloc_msix),
     DEVMETHOD(pcib_release_msix,    acpi_syscont_release_msix),
     DEVMETHOD(pcib_map_msi,     acpi_syscont_map_msi),
+#endif /* aarch64 */
 	DEVMETHOD_END
 };
 
@@ -89,7 +93,7 @@ vmbus_res_probe(device_t dev)
 {
 	char *id[] = { "VMBUS", NULL };
 	int rv;
-	device_printf(dev, "vmbus res probe called\n");	
+	
 	if (device_get_unit(dev) != 0 || vm_guest != VM_GUEST_HV ||
 	    (hyperv_features & CPUID_HV_MSR_SYNIC) == 0)
 		return (ENXIO);
@@ -102,10 +106,10 @@ vmbus_res_probe(device_t dev)
 static int
 vmbus_res_attach(device_t dev __unused)
 {
-#if 1
+#if defined(__aarch64__)
 	bus_generic_probe(dev);
 	bus_generic_attach(dev);
-#endif
+#endif /* aarch64 */
 	return (0);
 }
 
@@ -115,7 +119,7 @@ vmbus_res_detach(device_t dev __unused)
 
 	return (0);
 }
-
+#if defined(__aarch64__)
 static int
 acpi_syscont_alloc_msi(device_t bus, device_t dev, int count, int maxcount,
     int *irqs)
@@ -158,3 +162,4 @@ acpi_syscont_map_msi(device_t bus, device_t dev, int irq, uint64_t *addr,
 
     return (PCIB_MAP_MSI(device_get_parent(parent), dev, irq, addr, data));
 }
+#endif /* aarch64 */

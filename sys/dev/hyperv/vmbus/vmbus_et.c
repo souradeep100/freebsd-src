@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/hyperv_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
-#include <dev/hyperv/vmbus/hyperv_machdep.h>
+
 #define VMBUS_ET_NAME			"hvet"
 
 #define MSR_HV_STIMER0_CFG_SINT		\
@@ -81,7 +81,6 @@ static driver_t vmbus_et_driver = {
 DRIVER_MODULE(hv_et, vmbus, vmbus_et_driver, NULL, NULL);
 MODULE_VERSION(hv_et, 1);
 
-#define HV_REGISTER_STIMER0_COUNT 0x000B0001
 static __inline uint64_t
 hyperv_sbintime2count(sbintime_t time)
 {
@@ -100,7 +99,7 @@ vmbus_et_start(struct eventtimer *et __unused, sbintime_t first,
 
 	current = hyperv_tc64();
 	current += hyperv_sbintime2count(first);
-	WRMSR(HV_REGISTER_STIMER0_COUNT, current);
+	wrmsr(MSR_HV_STIMER0_COUNT, current);
 
 	return (0);
 }
@@ -125,11 +124,11 @@ vmbus_et_intr(struct trapframe *frame)
 static void
 vmbus_et_identify(driver_t *driver, device_t parent)
 {
-	/*if (device_get_unit(parent) != 0 ||
+	if (device_get_unit(parent) != 0 ||
 	    device_find_child(parent, VMBUS_ET_NAME, -1) != NULL ||
 	    (hyperv_features & CPUID_HV_ET_MASK) != CPUID_HV_ET_MASK ||
 	    hyperv_tc64 == NULL)
-		return;*/
+		return;
 
 	device_add_child(parent, VMBUS_ET_NAME, -1);
 }
@@ -137,15 +136,14 @@ vmbus_et_identify(driver_t *driver, device_t parent)
 static int
 vmbus_et_probe(device_t dev)
 {
-	device_printf(dev, " vmbus_et_probe called\n");
 	if (resource_disabled(VMBUS_ET_NAME, 0))
 		return (ENXIO);
 
 	device_set_desc(dev, "Hyper-V event timer");
-	device_printf(dev, " vmbus_et_probe returning\n");
+
 	return (BUS_PROBE_NOWILDCARD);
 }
-#define HV_REGISTER_STIMER0_CONFIG 0x000B0000
+
 static void
 vmbus_et_config(void *arg __unused)
 {
@@ -156,28 +154,26 @@ vmbus_et_config(void *arg __unused)
 	 * "Writing to the configuration register of a timer that
 	 *  is already enabled may result in undefined behaviour."
 	 */
-	printf("vmbus_et_config is called\n");
 	for (;;) {
 		uint64_t val;
 
 		/* Stop counting, and this also implies disabling STIMER0 */
-		WRMSR(HV_REGISTER_STIMER0_COUNT, 0);
+		wrmsr(MSR_HV_STIMER0_COUNT, 0);
 
-		val = RDMSR(HV_REGISTER_STIMER0_CONFIG);
+		val = rdmsr(MSR_HV_STIMER0_CONFIG);
 		if ((val & MSR_HV_STIMER_CFG_ENABLE) == 0)
 			break;
 		cpu_spinwait();
 	}
-	WRMSR(HV_REGISTER_STIMER0_CONFIG,
+	wrmsr(MSR_HV_STIMER0_CONFIG,
 	    MSR_HV_STIMER_CFG_AUTOEN | MSR_HV_STIMER0_CFG_SINT);
-	printf("vmbus_et_config is returning\n");
 }
 
 static int
 vmbus_et_attach(device_t dev)
 {
 	/* TODO: use independent IDT vector */
-	device_printf(dev, "vmbus_et_attach called\n");
+
 	vmbus_et.et_name = "Hyper-V";
 	vmbus_et.et_flags = ET_FLAGS_ONESHOT | ET_FLAGS_PERCPU;
 	vmbus_et.et_quality = 1000;

@@ -6,16 +6,19 @@
 KMOD=	hv_vmbus
 SRCS=	hyperv.c \
 	hyperv_busdma.c \
+	hyperv_machdep.c \
 	vmbus.c \
 	vmbus_br.c \
 	vmbus_chan.c \
 	vmbus_if.c \
 	vmbus_res.c \
-	vmbus_xact.c \
-	hyperv_machdep.c
+	vmbus_xact.c
 
 .if ${MACHINE_CPUARCH} != "i386" && ${MACHINE_CPUARCH} != "aarch64"
 SRCS+=	vmbus_vector.S
+.endif
+.if ${MACHINE_CPUARCH} != "aarch64"
+SRCS+= vmbus_et.c
 .endif
 SRCS+=	acpi_if.h bus_if.h device_if.h opt_acpi.h pci_if.h pcib_if.h vmbus_if.h
 

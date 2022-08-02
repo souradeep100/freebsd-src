@@ -393,7 +393,7 @@ vmbus_chan_open_br(struct vmbus_channel *chan, const struct vmbus_chan_br *cbr,
 		    "invalid udata len %d for chan%u\n", udlen, chan->ch_id);
 		return (EINVAL);
 	}
-	vmbus_chan_printf(chan,"vmbus_chan_open_br inside\n");
+
 	br = cbr->cbr;
 	txbr_size = cbr->cbr_txsz;
 	rxbr_size = cbr->cbr_rxsz;
@@ -432,7 +432,7 @@ vmbus_chan_open_br(struct vmbus_channel *chan, const struct vmbus_chan_br *cbr,
 
 	/* Create sysctl tree for this channel */
 	vmbus_chan_sysctl_create(chan);
-	vmbus_chan_printf(chan,"vmbus_chan_sysctl_create returned\n");
+
 	/*
 	 * Connect the bufrings, both RX and TX, to this channel.
 	 */
@@ -480,7 +480,7 @@ vmbus_chan_open_br(struct vmbus_channel *chan, const struct vmbus_chan_br *cbr,
 		vmbus_msghc_put(sc, mh);
 		goto failed;
 	}
-#if 1
+
 	for (;;) {
 		msg = vmbus_msghc_poll_result(sc, mh);
 		if (msg != NULL)
@@ -518,9 +518,6 @@ vmbus_chan_open_br(struct vmbus_channel *chan, const struct vmbus_chan_br *cbr,
 		}
 		pause("chopen", 1);
 	}
-#else //adding temp code before timer works
-	msg = vmbus_msghc_wait_result(sc, mh);
-#endif
 	if (msg != NULL) {
 		status = ((const struct vmbus_chanmsg_chopen_resp *)
 		    msg->msg_data)->chm_status;
@@ -528,7 +525,7 @@ vmbus_chan_open_br(struct vmbus_channel *chan, const struct vmbus_chan_br *cbr,
 		/* XXX any non-0 value is ok here. */
 		status = 0xff;
 	}
-	vmbus_chan_printf(chan, "calling vmbus_msghc_put\n");
+
 	vmbus_msghc_put(sc, mh);
 
 	if (status == 0) {
@@ -1362,9 +1359,7 @@ vmbus_chan_task(void *xchan, int pending __unused)
 	struct vmbus_channel *chan = xchan;
 	vmbus_chan_callback_t cb = chan->ch_cb;
 	void *cbarg = chan->ch_cbarg;
-#if 0
-	printf("vmbus_chan_task\n");
-#endif
+
 	KASSERT(chan->ch_poll_intvl == 0,
 	    ("chan%u: interrupted in polling mode", chan->ch_id));
 
@@ -1398,9 +1393,7 @@ static void
 vmbus_chan_task_nobatch(void *xchan, int pending __unused)
 {
 	struct vmbus_channel *chan = xchan;
-#if 0
-	printf("vmbus_chan_task_nobatch inside\n");
-#endif
+
 	KASSERT(chan->ch_poll_intvl == 0,
 	    ("chan%u: interrupted in polling mode", chan->ch_id));
 	chan->ch_cb(chan, chan->ch_cbarg);
@@ -1545,9 +1538,7 @@ vmbus_event_flags_proc(struct vmbus_softc *sc, volatile u_long *event_flags,
     int flag_cnt)
 {
 	int f;
-#if 0
-	device_printf(sc->vmbus_dev,"vmbus flag_cnt %d event_flag %lu\n",flag_cnt, *event_flags);
-#endif
+
 	for (f = 0; f < flag_cnt; ++f) {
 		uint32_t chid_base;
 		u_long flags;
@@ -1558,9 +1549,7 @@ vmbus_event_flags_proc(struct vmbus_softc *sc, volatile u_long *event_flags,
 
 		flags = atomic_swap_long(&event_flags[f], 0);
 		chid_base = f << VMBUS_EVTFLAG_SHIFT;
-#if 0
-		device_printf(sc->vmbus_dev,"vmbus_event_flags_proc before while\n");
-#endif
+
 		while ((chid_ofs = ffsl(flags)) != 0) {
 			struct vmbus_channel *chan;
 
@@ -1573,15 +1562,10 @@ vmbus_event_flags_proc(struct vmbus_softc *sc, volatile u_long *event_flags,
 				continue;
 			}
 			__compiler_membar();
-#if 0
-			device_printf(sc->vmbus_dev,"vmbus_event_flags_proc after compiler_membar\n");
-#endif
+
 			if (chan->ch_flags & VMBUS_CHAN_FLAG_BATCHREAD)
 				vmbus_rxbr_intr_mask(&chan->ch_rxbr);
 			taskqueue_enqueue(chan->ch_tq, &chan->ch_task);
-#if 0
-			device_printf(sc->vmbus_dev,"vmbus_event_flags_proc taskqueue_enqueued\n");
-#endif
 		}
 	}
 }
@@ -1595,9 +1579,6 @@ vmbus_event_proc(struct vmbus_softc *sc, int cpu)
 	 * On Host with Win8 or above, the event page can be checked directly
 	 * to get the id of the channel that has the pending interrupt.
 	 */
-#if 0
-	device_printf(sc->vmbus_dev,"vmbus inside vmbus_event_proc\n");
-#endif
 	eventf = VMBUS_PCPU_GET(sc, event_flags, cpu) + VMBUS_SINT_MESSAGE;
 	vmbus_event_flags_proc(sc, eventf->evt_flags,
 	    VMBUS_PCPU_GET(sc, event_flags_cnt, cpu));
@@ -1607,7 +1588,7 @@ void
 vmbus_event_proc_compat(struct vmbus_softc *sc, int cpu)
 {
 	struct vmbus_evtflags *eventf;
-	device_printf(sc->vmbus_dev,"vmbus inside vmbus_event_proc_compat\n");
+
 	eventf = VMBUS_PCPU_GET(sc, event_flags, cpu) + VMBUS_SINT_MESSAGE;
 	if (atomic_testandclear_long(&eventf->evt_flags[0], 0)) {
 		vmbus_event_flags_proc(sc, sc->vmbus_rx_evtflags,
@@ -1624,12 +1605,11 @@ vmbus_chan_update_evtflagcnt(struct vmbus_softc *sc,
 
 	flag_cnt = (chan->ch_id / VMBUS_EVTFLAG_LEN) + 1;
 	flag_cnt_ptr = VMBUS_PCPU_PTR(sc, event_flags_cnt, chan->ch_cpuid);
-	vmbus_chan_printf(chan,"vmbus_chan_update_evt flagcnt flag_cnt %d\n",flag_cnt);
+
 	for (;;) {
 		int old_flag_cnt;
-		
+
 		old_flag_cnt = *flag_cnt_ptr;
-		vmbus_chan_printf(chan,"vmbus_chan_update_evt old_flag_cnt %d\n",old_flag_cnt);
 		if (old_flag_cnt >= flag_cnt)
 			break;
 		if (atomic_cmpset_int(flag_cnt_ptr, old_flag_cnt, flag_cnt)) {

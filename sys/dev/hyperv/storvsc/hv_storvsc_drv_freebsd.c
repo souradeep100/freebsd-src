@@ -565,12 +565,6 @@ hv_storvsc_channel_init(struct storvsc_softc *sc)
 	}
 
 	max_subch = vstor_packet->u.chan_props.max_channel_cnt;
-
-#if 1
-	device_printf(sc->hs_dev,
-	    "hv_storvsc_channel_int,chk 40, mac_subch = %u\n", max_subch);
-#endif
-
 	if (hv_storvsc_chan_cnt > 0 && hv_storvsc_chan_cnt < (max_subch + 1))
 		max_subch = hv_storvsc_chan_cnt - 1;
 
@@ -880,8 +874,6 @@ hv_storvsc_on_channel_callback(struct vmbus_channel *channel, void *xsc)
 				hv_storvsc_rescan_target(sc);
 				break;
 			default:
-				printf("storvsc: on_chan_callback, unknown: 0x%x, bytes = %d\n",
-				    vstor_packet->operation, bytes_recvd);
 				break;
 			}			
 		}
@@ -944,7 +936,7 @@ storvsc_create_chan_sel(struct storvsc_softc *sc)
 	nsubch = sc->hs_nchan - 1;
 	if (nsubch == 0)
 		return;
-	printf("storvsc_create_chan_sel inside\n");
+
 	subch = vmbus_subchan_get(sc->hs_chan, nsubch);
 	for (i = 0; i < nsubch; i++)
 		sc->hs_sel_chan[i + 1] = subch[i];
@@ -978,7 +970,7 @@ storvsc_init_requests(device_t dev)
 		device_printf(dev, "failed to create storvsc dma tag\n");
 		return (error);
 	}
-	device_printf(dev, "storvsc_init_requests inside\n");
+
 	for (i = 0; i < sc->hs_drv_props->drv_max_ios_per_target; ++i) {
 		reqp = malloc(sizeof(struct hv_storvsc_request),
 				 M_DEVBUF, M_WAITOK|M_ZERO);
@@ -1103,7 +1095,7 @@ storvsc_attach(device_t dev)
 	sc->hs_dev	= dev;
 
 	mtx_init(&sc->hs_lock, "hvslck", NULL, MTX_DEF);
-	printf("storvsc_attach storvsc calling storvsc_init_requests\n");
+
 	ret = storvsc_init_requests(dev);
 	if (ret != 0)
 		goto cleanup;
@@ -1113,7 +1105,7 @@ storvsc_attach(device_t dev)
 		g_hv_sgl_page_pool.is_init = TRUE;
 		LIST_INIT(&g_hv_sgl_page_pool.in_use_sgl_list);
 		LIST_INIT(&g_hv_sgl_page_pool.free_sgl_list);
-		printf("storvsc_attach LIST_INIT is done\n");
+
 		/*
 		 * Pre-create SG list, each SG list with
 		 * STORVSC_DATA_SEGCNT_MAX segments, each
@@ -1142,13 +1134,12 @@ storvsc_attach(device_t dev)
 	sc->hs_destroy = FALSE;
 	sc->hs_drain_notify = FALSE;
 	sema_init(&sc->hs_drain_sema, 0, "Store Drain Sema");
-	printf("storvsc_attach calling hv_storvsc_connect\n");
 
 	ret = hv_storvsc_connect_vsp(sc);
 	if (ret != 0) {
 		goto cleanup;
 	}
-	printf("storvsc_attach calling storvsc_create_chan_sel\n");
+
 	/* Construct cpu to channel mapping */
 	storvsc_create_chan_sel(sc);
 
@@ -1156,7 +1147,6 @@ storvsc_attach(device_t dev)
 	 * Create the device queue.
 	 * Hyper-V maps each target to one SCSI HBA
 	 */
-	printf("storvsc_attach calling  cam_simq_alloc\n");
 	devq = cam_simq_alloc(sc->hs_drv_props->drv_max_ios_per_target);
 	if (devq == NULL) {
 		device_printf(dev, "Failed to alloc device queue\n");
@@ -1180,7 +1170,6 @@ storvsc_attach(device_t dev)
 		goto cleanup;
 	}
 
-	printf("storvsc_attach xpt_bus_register\n");
 	mtx_lock(&sc->hs_lock);
 	/* bus_id is set to 0, need to get it from VMBUS channel query? */
 	if (xpt_bus_register(sc->hs_sim, dev, 0) != CAM_SUCCESS) {
@@ -1190,7 +1179,7 @@ storvsc_attach(device_t dev)
 		ret = ENXIO;
 		goto cleanup;
 	}
-	printf("storvsc_attach xpt_create_path\n");
+
 	if (xpt_create_path(&sc->hs_path, /*periph*/NULL,
 		 cam_sim_path(sc->hs_sim),
 		CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
@@ -1203,7 +1192,7 @@ storvsc_attach(device_t dev)
 	}
 
 	mtx_unlock(&sc->hs_lock);
-	printf("storvsc_attach storvsc_sysctl\n");
+
 	storvsc_sysctl(dev);
 
 	root_mount_rel(root_mount_token);
@@ -1456,9 +1445,6 @@ storvsc_action(struct cam_sim *sim, union ccb *ccb)
 	int res;
 
 	mtx_assert(&sc->hs_lock, MA_OWNED);
-#if 0
-	printf("storvsc: receive action cmd = 0x%x\n", ccb->ccb_h.func_code);
-#endif
 	switch (ccb->ccb_h.func_code) {
 	case XPT_PATH_INQ: {
 		struct ccb_pathinq *cpi = &ccb->cpi;
@@ -1845,27 +1831,16 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 	for (i = 0; i < nsegs; i++) {
 #ifdef INVARIANTS
 		if (nsegs > 1) {
-#if 0
 			if (i == 0) {
+#if !defined(__aarch64__)
 				KASSERT((segs[i].ds_addr & PAGE_MASK) +
 				    segs[i].ds_len == PAGE_SIZE,
 				    ("invalid 1st page, ofs 0x%jx, len %zu",
 				     (uintmax_t)segs[i].ds_addr,
 				     segs[i].ds_len));
-			} else if (i == nsegs - 1) {
-				KASSERT((segs[i].ds_addr & PAGE_MASK) == 0,
-				    ("invalid last page, ofs 0x%jx",
-				     (uintmax_t)segs[i].ds_addr));
-			} else {
-				KASSERT((segs[i].ds_addr & PAGE_MASK) == 0 &&
-				    segs[i].ds_len == PAGE_SIZE,
-				    ("not a full page, ofs 0x%jx, len %zu",
-				     (uintmax_t)segs[i].ds_addr,
-				     segs[i].ds_len));
-			}
 #else
-			if (i == 0) {
-				;
+				/* do nothing for arm64 */
+#endif	
 			} else if (i == nsegs - 1) {
 				KASSERT((segs[i].ds_addr & PAGE_MASK) == 0,
 				    ("invalid last page, ofs 0x%jx",
@@ -1877,13 +1852,13 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 				     (uintmax_t)segs[i].ds_addr,
 				     segs[i].ds_len));
 			}
-#endif
 		}
 #endif
 		prplist->gpa_page[i] = atop(segs[i].ds_addr);
 	}
 	reqp->prp_cnt = nsegs;
 
+#if defined(__aarch64__)
 	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
 		bus_dmasync_op_t op;
 		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
@@ -1894,6 +1869,7 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
 		    reqp->data_dmap, op);
 	}
+#endif
 }
 
 /**
@@ -1987,12 +1963,6 @@ create_storvsc_request(union ccb *ccb, struct hv_storvsc_request *reqp)
 			    "bus_dmamap_load_ccb failed: %d\n", error);
 			return (error);
 		}
-#if 0
-		xpt_print(ccb->ccb_h.path,
-		    "CAM_DATA = 0x%x, bus_dmamap_sync() called\n",
-		    (ccb->ccb_h.flags & CAM_DATA_MASK));
-#endif
-
 		if ((ccb->ccb_h.flags & CAM_DATA_MASK) == CAM_DATA_BIO)
 			reqp->softc->sysctl_data.data_bio_cnt++;
 		else
@@ -2160,6 +2130,7 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 	int ori_sg_count = 0;
 	const struct scsi_generic *cmd;
 
+#if defined(__aarch64__)
 	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
 		bus_dmasync_op_t op;
 
@@ -2171,7 +2142,7 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 		bus_dmamap_sync(sc->storvsc_req_dtag, reqp->data_dmap, op);
 		bus_dmamap_unload(sc->storvsc_req_dtag, reqp->data_dmap);
 	}
-
+#endif /* aarch64 */
 	/* destroy bounce buffer if it is used */
 	if (reqp->bounce_sgl_count) {
 		ori_sglist = (bus_dma_segment_t *)ccb->csio.data_ptr;
@@ -2234,10 +2205,6 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 		hv_storvsc_srb_status = -1;
 	}
 #endif /* DIAGNOSTIC */
-#if 0
-	printf("storvsc: io_done, scsi_status: 0x%x, srb_status: 0x%x\n",
-	    vm_srb->scsi_status, srb_status);
-#endif
 	if (vm_srb->scsi_status == SCSI_STATUS_OK) {
 		if (srb_status != SRB_STATUS_SUCCESS) {
 			bool log_error = true;
@@ -2377,12 +2344,6 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 			resp_buf_len = resp_xfer_len >= 5 ? resp_buf[4] + 5 : 0;
 			data_len = (resp_buf_len < resp_xfer_len) ?
 			    resp_buf_len : resp_xfer_len;
-
-#if 1
-			xpt_print(ccb->ccb_h.path, "storvsc inquiry "
-			    "resp_xfer_len = %d, resp_buf_len = %d, data_len = %d\n",
-			    resp_xfer_len, resp_buf_len, data_len);
-#endif
 			if (bootverbose && data_len >= 5) {
 				xpt_print(ccb->ccb_h.path, "storvsc inquiry "
 				    "(%d) [%x %x %x %x %x ... ]\n", data_len,
