@@ -37,7 +37,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/timeet.h>
 
 #include <dev/hyperv/include/hyperv.h>
-#include <dev/hyperv/vmbus/hyperv_reg.h>
+#if defined(__aarch64__)
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
+#else
+#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
 

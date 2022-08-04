@@ -22,30 +22,18 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifndef _HYPERV_MACHDEP_H_
+#define _HYPERV_MACHDEP_H_
 
 #include <sys/param.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
 
-uint64_t
-hypercall_md(volatile void *hc_addr, uint64_t in_val,
-    uint64_t in_paddr, uint64_t out_paddr)
-{
-	uint32_t in_val_hi = in_val >> 32;
-	uint32_t in_val_lo = in_val & 0xFFFFFFFF;
-	uint32_t status_hi, status_lo;
-	uint32_t in_paddr_hi = in_paddr >> 32;
-	uint32_t in_paddr_lo = in_paddr & 0xFFFFFFFF;
-	uint32_t out_paddr_hi = out_paddr >> 32;
-	uint32_t out_paddr_lo = out_paddr & 0xFFFFFFFF;
+uint64_t	hypercall_md(volatile void *hc_addr, uint64_t in_val,
+		    uint64_t in_paddr, uint64_t out_paddr);
 
-	__asm__ __volatile__ ("call *%8" : "=d"(status_hi), "=a"(status_lo) :
-	    "d" (in_val_hi), "a" (in_val_lo),
-	    "b" (in_paddr_hi), "c" (in_paddr_lo),
-	    "D"(out_paddr_hi), "S"(out_paddr_lo),
-	    "m" (hc_addr));
-	return (status_lo | ((uint64_t)status_hi << 32));
-}
+#define WRMSR(msr, val) wrmsr(msr, val)
+#define RDMSR(msr) rdmsr(msr)
+#endif	/* !_HYPERV_MACHDEP_H_ */

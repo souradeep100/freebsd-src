@@ -42,10 +42,10 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
-#include <dev/hyperv/vmbus/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/hyperv_reg.h>
-#include <dev/hyperv/vmbus/hyperv_var.h>
+#include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
 #include <dev/psci/smccc.h>
+#include <dev/hyperv/vmbus/hyperv_var.h>
 
 #define HVCALL_SET_VP_REGISTERS 0x0051
 #define HVCALL_GET_VP_REGISTERS         0x0050

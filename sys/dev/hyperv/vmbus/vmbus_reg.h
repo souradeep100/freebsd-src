@@ -32,7 +32,11 @@
 #include <sys/param.h>
 #include <dev/hyperv/include/hyperv.h> /* XXX for hyperv_guid */
 #include <dev/hyperv/include/vmbus.h>
-#include <dev/hyperv/vmbus/hyperv_reg.h>
+#if defined(__aarch64__)
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
+#else
+#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#endif
 
 /*
  * Hyper-V SynIC message format.

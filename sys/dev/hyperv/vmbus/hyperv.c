@@ -45,8 +45,13 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
-#include <dev/hyperv/vmbus/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/hyperv_reg.h>
+#if defined(__aarch64__)
+#include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
+#else
+#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
 #define HYPERV_FREEBSD_BUILD		0ULL
@@ -80,8 +85,8 @@ static void			hypercall_memfree(void);
 u_int				hyperv_ver_major;
 
 u_int				hyperv_features;
-#if !defined(__aarch64__)
 u_int				hyperv_recommends;
+#if !defined(__aarch64__)
 static u_int			hyperv_pm_features;
 static u_int			hyperv_features3;
 static struct timecounter	hyperv_timecounter = {
@@ -137,10 +142,6 @@ hyperv_guid2str(const struct hyperv_guid *guid, char *buf, size_t sz)
 	    d[5], d[4], d[7], d[6], d[8], d[9],
 	    d[10], d[11], d[12], d[13], d[14], d[15]);
 }
-#define HV_REGISTER_HYPERVISOR_VERSION      0x00000100 /*CPUID 0x40000002 */
-#define HV_REGISTER_FEATURES            0x00000200 /*CPUID 0x40000003 */
-#define HV_REGISTER_ENLIGHTENMENTS      0x00000201 /*CPUID 0x40000004 */
-#define HV_REGISTER_GUEST_OSID      0x00090002
 
 static bool
 hyperv_identify(void)
@@ -150,10 +151,12 @@ hyperv_identify(void)
 	printf("Hyper-V identify\n");
 	vm_guest = VM_GUEST_HV;
 
-	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
+	hv_get_vpreg_128(CPUID_LEAF_HV_FEATURES, &result);
 	hyperv_features = result.as32.a;
-	hv_get_vpreg_128(HV_REGISTER_HYPERVISOR_VERSION, &result);
+	hv_get_vpreg_128(CPUID_LEAF_HV_IDENTITY, &result);
 	hyperv_ver_major = result.as32.b >> 16;
+	hv_get_vpreg_128(CPUID_LEAF_HV_RECOMMENDS, &result);
+	hyperv_recommends = result.as32.a;
 #else
 	u_int regs[4];
 	unsigned int maxleaf;
@@ -256,7 +259,7 @@ hyperv_init(void *dummy __unused)
 	}
 
 	/* Set guest id */
-	WRMSR(HV_REGISTER_GUEST_OSID, MSR_HV_GUESTID_FREEBSD);
+	WRMSR(MSR_HV_GUEST_OS_ID, MSR_HV_GUESTID_FREEBSD);
 #if !defined(__aarch64__)
 	if (hyperv_features & CPUID_HV_MSR_TIME_REFCNT) {
 		/*
