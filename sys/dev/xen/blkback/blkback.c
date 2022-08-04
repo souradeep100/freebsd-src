@@ -80,7 +80,6 @@ __FBSDID("$FreeBSD$");
 #include <xen/gnttab.h>
 #include <xen/xen_intr.h>
 
-#include <contrib/xen/arch-x86/cpuid.h>
 #include <contrib/xen/event_channel.h>
 #include <contrib/xen/grant_table.h>
 
@@ -1559,14 +1558,12 @@ xbb_dispatch_io(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist)
 
 	STAILQ_FOREACH(nreq, &reqlist->contig_req_list, links) {
 		blkif_request_t		*ring_req;
-		u_int			 req_seg_idx;
 
 		ring_req	      = nreq->ring_req;
 		nr_sects              = 0;
 		nseg                  = ring_req->nr_segments;
 		nreq->nr_pages        = nseg;
 		nreq->nr_512b_sectors = 0;
-		req_seg_idx	      = 0;
 		sg	              = NULL;
 
 		/* Check that number of segments is sane. */
@@ -1620,7 +1617,6 @@ xbb_dispatch_io(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist)
 			map++;
 			xbb_sg++;
 			seg_idx++;
-			req_seg_idx++;
 		}
 
 		/* Convert to the disk's sector size */
@@ -3318,16 +3314,12 @@ xbb_attach_failed(struct xbb_softc *xbb, int err, const char *fmt, ...)
 static int
 xbb_probe(device_t dev)
 {
-	uint32_t regs[4];
 
 	if (strcmp(xenbus_get_type(dev), "vbd"))
 		return (ENXIO);
 
-	KASSERT(xen_cpuid_base != 0, ("Invalid base Xen CPUID leaf"));
-	cpuid_count(xen_cpuid_base + 4, 0, regs);
-
 	/* Only attach if Xen creates IOMMU entries for grant mapped pages. */
-	if (!(regs[0] & XEN_HVM_CPUID_IOMMU_MAPPINGS)) {
+	if (!xen_has_iommu_maps()) {
 		static bool warned;
 
 		if (!warned) {
