@@ -45,13 +45,8 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
-#if defined(__aarch64__)
-#include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
-#else
 #include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
 #include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
-#endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
 #define HYPERV_FREEBSD_BUILD		0ULL
@@ -59,7 +54,7 @@ __FBSDID("$FreeBSD$");
 #define HYPERV_FREEBSD_OSID		0ULL
 
 void	hyperv_init_tc(void);
-int		hypercall_page_setup(void);
+int		hypercall_page_setup(vm_paddr_t);
 void	hypercall_disable(void);
 bool	hyperv_identify_features(void);
 
@@ -72,6 +67,7 @@ hyperv_tc64_t           hyperv_tc64;
 
 static u_int            hyperv_pm_features;
 static u_int            hyperv_features3;
+static u_int            hyperv_get_timecount(struct timecounter *);
 
 static struct timecounter   hyperv_timecounter = {
 	.tc_get_timecount   = hyperv_get_timecount,
@@ -117,7 +113,7 @@ hyperv_init_tc(void)
 }
 
 int
-hypercall_page_setup(void)
+hypercall_page_setup(vm_paddr_t paddr)
 {
 	uint64_t hc, hc_orig;
 	hc_orig = rdmsr(MSR_HV_HYPERCALL);
@@ -127,7 +123,7 @@ hypercall_page_setup(void)
 	 *
 	 * NOTE: 'reserved' bits MUST be preserved.
 	 */
-	hc = ((hypercall_context.hc_paddr >> PAGE_SHIFT) <<
+	hc = ((paddr >> PAGE_SHIFT) <<
 		MSR_HV_HYPERCALL_PGSHIFT) |
 		(hc_orig & MSR_HV_HYPERCALL_RSVD_MASK) |
 		MSR_HV_HYPERCALL_ENABLE;

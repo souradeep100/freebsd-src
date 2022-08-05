@@ -51,6 +51,16 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 #include <machine/bus.h>
+#if defined(__aarch64__)
+#include <dev/psci/smccc.h>
+#include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
+#else
+#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#include <machine/intr_machdep.h>
+#include <x86/include/apicvar.h>
+#endif
 #include <machine/metadata.h>
 #include <machine/md_var.h>
 #include <machine/resource.h>
@@ -63,16 +73,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/vmbus_reg.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
 #include <dev/hyperv/vmbus/vmbus_chanvar.h>
-#if defined(__aarch64__)
-#include <dev/psci/smccc.h>
-#include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
-#else
-#include <x86/include/apicvar.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
-#include <machine/intr_machdep.h>
-#endif
 #include "acpi_if.h"
 #include "pcib_if.h"
 #include "vmbus_if.h"

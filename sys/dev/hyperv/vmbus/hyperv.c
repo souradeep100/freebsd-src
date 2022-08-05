@@ -73,11 +73,6 @@ __FBSDID("$FreeBSD$");
 	 MSR_HV_GUESTID_OSID_FREEBSD |	\
 	 MSR_HV_GUESTID_OSTYPE_FREEBSD)
 
-struct hypercall_ctx {
-	void			*hc_addr;
-	vm_paddr_t		hc_paddr;
-};
-
 static bool			hyperv_identify(void);
 static void			hypercall_memfree(void);
 
@@ -155,7 +150,7 @@ hypercall_create(void *arg __unused)
 	hypercall_context.hc_addr = (void *)kmem_malloc(PAGE_SIZE, M_EXEC |
 	    M_WAITOK);
 	hypercall_context.hc_paddr = vtophys(hypercall_context.hc_addr);
-	ret = hypercall_page_setup();
+	ret = hypercall_page_setup(hypercall_context.hc_paddr);
 	if (ret) {
 		hypercall_memfree();
 		return;

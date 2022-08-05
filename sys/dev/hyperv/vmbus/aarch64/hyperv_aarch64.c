@@ -45,21 +45,13 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
-#if defined(__aarch64__)
 #include <dev/hyperv/vmbus/aarch64/hyperv_machdep.h>
 #include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
-#else
-#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
-#endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
-#define HYPERV_FREEBSD_BUILD		0ULL
-#define HYPERV_FREEBSD_VERSION		((uint64_t)__FreeBSD_version)
-#define HYPERV_FREEBSD_OSID		0ULL
 
 void	hyperv_init_tc(void);
-int		hypercall_page_setup(void);
+int		hypercall_page_setup(vm_paddr_t);
 void	hypercall_disable(void);
 bool	hyperv_identify_features(void);
 
@@ -78,7 +70,7 @@ hyperv_init_tc(void)
 }
 
 int
-hypercall_page_setup(void)
+hypercall_page_setup(vm_paddr_t hc)
 {
 	return (0);
 }	

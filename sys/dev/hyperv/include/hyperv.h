@@ -87,7 +87,7 @@ int			hyperv_guid2str(const struct hyperv_guid *, char *,
 			    size_t);
 
 void	hyperv_init_tc(void);
-int		hypercall_page_setup(void);
+int		hypercall_page_setup(vm_paddr_t);
 void	hypercall_disable(void);
 bool	hyperv_identify_features(void);
 
