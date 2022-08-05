@@ -135,6 +135,12 @@ struct vmbus_softc {
 	/* The list of usable MMIO ranges for PCIe pass-through */
 	struct pcib_host_resources vmbus_mmio_res;
 #endif
+
+#if defined(__aarch64__)
+	struct resource *ires;
+	void *icookie;
+	int vector;
+#endif
 };
 
 #define VMBUS_FLAG_ATTACHED	0x0001	/* vmbus was attached */
@@ -174,4 +180,11 @@ void		vmbus_msghc_wakeup(struct vmbus_softc *,
 		    const struct vmbus_message *);
 void		vmbus_msghc_reset(struct vmbus_msghc *, size_t);
 
+void    vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
+        struct trapframe *frame);
+
+void    vmbus_synic_setup1(void *xsc);
+void    vmbus_synic_teardown1(void);
+int     vmbus_setup_intr1(struct vmbus_softc *sc);
+void    vmbus_intr_teardown1(struct vmbus_softc *sc);
 #endif	/* !_VMBUS_VAR_H_ */

@@ -68,6 +68,8 @@ static device_method_t vmbus_res_methods[] = {
 #if defined(__aarch64__)
 	DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
 	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+	DEVMETHOD(bus_release_resource, bus_generic_release_resource),
+	DEVMETHOD(bus_teardown_intr,    bus_generic_teardown_intr),
     /* pcib interface */
     DEVMETHOD(pcib_alloc_msi,       acpi_syscont_alloc_msi),
     DEVMETHOD(pcib_release_msi,     acpi_syscont_release_msi),
@@ -108,7 +110,7 @@ vmbus_res_attach(device_t dev __unused)
 {
 #if defined(__aarch64__)
 	bus_generic_probe(dev);
-	bus_generic_attach(dev);
+	return(bus_generic_attach(dev));
 #endif /* aarch64 */
 	return (0);
 }
@@ -116,7 +118,12 @@ vmbus_res_attach(device_t dev __unused)
 static int
 vmbus_res_detach(device_t dev __unused)
 {
-
+#if defined(__aarch64__)
+	int error;
+	error = bus_generic_detach(dev);
+	if (error)
+		return (error);
+#endif
 	return (0);
 }
 #if defined(__aarch64__)
