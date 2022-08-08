@@ -79,7 +79,6 @@ hypercall_page_setup(vm_paddr_t hc)
 void
 hypercall_disable(void)
 {
-	//do nothing for aarch64, it is just a stub
 	return;
 }
 
