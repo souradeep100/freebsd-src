@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 #if defined(__aarch64__)
 #include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
 #else
-#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>

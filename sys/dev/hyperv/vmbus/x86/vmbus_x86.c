@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2009-2012,2016-2017 Microsoft Corp.
+ * Copyright (c) 2009-2012,2016-2017, 2022-2023 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
  * All rights reserved.
@@ -65,8 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/vmbus_var.h>
 #include <dev/hyperv/vmbus/vmbus_chanvar.h>
 #include <x86/include/apicvar.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#include <dev/hyperv/vmbus/x86/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #include "acpi_if.h"
 #include "pcib_if.h"
 #include "vmbus_if.h"

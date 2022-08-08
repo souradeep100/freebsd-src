@@ -44,8 +44,8 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_machdep.h>
-#include <dev/hyperv/vmbus/amd64/hyperv_reg.h>
+#include <dev/hyperv/vmbus/x86/hyperv_machdep.h>
+#include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
 struct hyperv_reftsc_ctx {

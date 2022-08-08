@@ -19,7 +19,6 @@ CSCOPE_ARCHDIR += x86
 .endif
 .endif
 .endif
-CSCOPE_ARCHDIR += arm arm64
 
 HTAGSFLAGS+= -at `awk -F= '/^RELEASE *=/{release=$2}; END {print "FreeBSD", release, "kernel"}' < conf/newvers.sh`
 

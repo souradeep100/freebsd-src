@@ -607,7 +607,7 @@ arm64/rockchip/clk/rk3399_pmucru.c		optional fdt soc_rockchip_rk3399
 # Xilinx
 arm/xilinx/uart_dev_cdnc.c			optional uart soc_xilinx_zynq
 
-#Microsoft Hyper-V
+# Microsoft Hyper-V
 dev/hyperv/vmbus/hyperv.c		optional	hyperv
 dev/hyperv/vmbus/aarch64/hyperv_aarch64.c		optional    hyperv
 dev/hyperv/vmbus/vmbus.c				optional	hyperv pci
@@ -629,4 +629,3 @@ dev/hyperv/netvsc/hn_nvs.c				optional	hyperv
 dev/hyperv/netvsc/hn_rndis.c			optional	hyperv
 dev/hyperv/netvsc/if_hn.c				optional	hyperv
 dev/hyperv/vmbus/aarch64/smccc_1_2_arm64.S		optional	hyperv
-#dev/hyperv/pcib/vmbus_pcib.c			optional	hyperv pci
