@@ -167,6 +167,10 @@ SYSCTL_PROC(_net_inet_ip, OID_AUTO, maxfragbucketsize,
     sysctl_maxfragbucketsize, "I",
     "Maximum number of IPv4 fragment reassembly queue entries per bucket");
 
+static u_int ipfragttl = IPFRAGTTL / 2;
+SYSCTL_UINT(_net_inet_ip, OID_AUTO, fragttl, CTLFLAG_RD, &ipfragttl,
+    IPFRAGTTL / 2, "IP fragment life time on reassembly queue");
+
 /*
  * Take incoming datagram fragment and try to reassemble it into
  * whole datagram.  If the argument is the first fragment or one
@@ -595,6 +599,21 @@ ipreass_timer_init(void *arg __unused)
 	callout_reset_sbt(&ipreass_callout, SBT_1MS * 500, SBT_1MS * 10,
 	    ipreass_slowtimo, NULL, 0);
 }
+
+static void
+ipreass_drain_vnet(void)
+{
+
+	for (int i = 0; i < IPREASS_NHASH; i++) {
+		IPQ_LOCK(i);
+		while(!TAILQ_EMPTY(&V_ipq[i].head))
+			ipq_drop(&V_ipq[i], TAILQ_FIRST(&V_ipq[i].head));
+		KASSERT(V_ipq[i].count == 0,
+		    ("%s: V_ipq[%d] count %d (V_ipq=%p)", __func__, i,
+		    V_ipq[i].count, V_ipq));
+		IPQ_UNLOCK(i);
+	}
+}
 SYSINIT(ipreass, SI_SUB_VNET_DONE, SI_ORDER_ANY, ipreass_timer_init, NULL);
 
 /*
@@ -607,16 +626,7 @@ ipreass_drain(void)
 
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);
-		for (int i = 0; i < IPREASS_NHASH; i++) {
-			IPQ_LOCK(i);
-			while(!TAILQ_EMPTY(&V_ipq[i].head))
-				ipq_drop(&V_ipq[i],
-				    TAILQ_FIRST(&V_ipq[i].head));
-			KASSERT(V_ipq[i].count == 0,
-			    ("%s: V_ipq[%d] count %d (V_ipq=%p)", __func__, i,
-			    V_ipq[i].count, V_ipq));
-			IPQ_UNLOCK(i);
-		}
+		ipreass_drain_vnet();
 		CURVNET_RESTORE();
 	}
 }
@@ -706,7 +716,7 @@ void
 ipreass_destroy(void)
 {
 
-	ipreass_drain();
+	ipreass_drain_vnet();
 	uma_zdestroy(V_ipq_zone);
 	V_ipq_zone = NULL;
 	for (int i = 0; i < IPREASS_NHASH; i++)
