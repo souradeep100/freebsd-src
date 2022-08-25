@@ -1,4 +1,5 @@
-/*-
+/*
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  * Copyright (c) 2022 Microsoft Corp.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,8 +31,6 @@
 
 #include <sys/param.h>
 
-uint64_t hypercall_md(volatile void *hc_addr, uint64_t in_val,
-    uint64_t in_paddr, uint64_t out_paddr);
 typedef uint32_t u32;
 typedef uint64_t u64;
 struct hv_get_vp_registers_output {
@@ -49,9 +48,12 @@ struct hv_get_vp_registers_output {
 	};
 };
 
+uint64_t hypercall_md(volatile void *hc_addr, u64 in_val,
+    u64 in_paddr, u64 out_paddr);
 void hv_get_vpreg_128(u32, struct hv_get_vp_registers_output *);
 void arm_hv_set_vreg(u32 msr, u64 val);
 #define WRMSR(msr, val) arm_hv_set_vreg(msr, val)
 u64 arm_hv_get_vreg(u32 msr);
 #define RDMSR(msr) arm_hv_get_vreg(msr)
+
 #endif /* !_HYPERV_MACHDEP_H_ */

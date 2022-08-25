@@ -1,6 +1,6 @@
-/*-
+/*
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  * Copyright (c) 2016-2017,2022-2023 Microsoft Corp.
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,14 +49,12 @@ __FBSDID("$FreeBSD$");
 	SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL, \
 	    SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER))
 
-void arm_hv_set_vreg(u32, u64);
-void hv_get_vpreg_128(u32, struct hv_get_vp_registers_output *);
-u64 arm_hv_get_vreg(u32 msr);
 void
 arm_hv_set_vreg(u32 msr, u64 value)
 {
 	struct arm_smccc_res res;
 	int64_t hv_func_id;
+
 	hv_func_id = SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,
 	    SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER));
 	arm_smccc_hvc(hv_func_id,
@@ -95,7 +93,7 @@ arm_hv_get_vreg(u32 msr)
 
 	hv_get_vpreg_128(msr, &output);
 
-	return output.as64.low;
+	return (output.as64.low);
 }
 
 uint64_t
@@ -104,6 +102,7 @@ hypercall_md(volatile void *hc_addr, uint64_t in_val, uint64_t in_paddr,
 {
 	struct arm_smccc_res res;
 	int64_t hv_func_id;
+
 	hv_func_id = SMCCC_FUNC_ID(SMCCC_YIELDING_CALL, SMCCC_64BIT_CALL,
 	    SMCCC_VENDOR_HYP_SERVICE_CALLS, (HV_SMCCC_FUNC_NUMBER));
 	arm_smccc_hvc(hv_func_id, in_val, in_paddr, out_paddr, 0, 0, 0, 0,
