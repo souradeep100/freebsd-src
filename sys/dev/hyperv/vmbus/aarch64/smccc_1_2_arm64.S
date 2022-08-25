@@ -1,6 +1,6 @@
-/*-
+/*
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  * Copyright (c) 2022 Microsoft Corp.
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
  *
  * $FreeBSD$
  */
+
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
@@ -33,7 +34,6 @@ __FBSDID("$FreeBSD$");
 ENTRY(arm_smccc_1_2_hvc)
 	stp     x1, x19, [sp, #-16]!
 	mov x19, x0
-	
 	ldp	x0, x1, [x19, #16 * 0]
 	ldp x2, x3, [x19, #16 * 1]
 	ldp x4, x5,  [x19, #16 * 2]
@@ -43,11 +43,9 @@ ENTRY(arm_smccc_1_2_hvc)
 	ldp x12, x13, [x19, #16 * 6]
 	ldp x14, x15, [x19, #16 * 7]
 	ldp x16, x17, [x19, #16 * 8]
-	
 	hvc #0
 	ldr x19, [sp]
 	cbz x19, 1f
-	
 	stp	x0, x1, [x19, #16 * 0]
 	stp x2, x3, [x19, #16 * 1]
 	stp x4, x5,  [x19, #16 * 2]
@@ -57,7 +55,6 @@ ENTRY(arm_smccc_1_2_hvc)
 	stp x12, x13, [x19, #16 * 6]
 	stp x14, x15, [x19, #16 * 7]
 	stp x16, x17, [x19, #16 * 8]
-
 	ldp     xzr, x19, [sp], #16
 1:	ret
 END(arm_smccc_1_2_hvc)
