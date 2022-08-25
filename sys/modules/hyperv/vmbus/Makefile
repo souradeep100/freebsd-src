@@ -21,7 +21,7 @@ SRCS+=	vmbus_vector.S
 .if ${MACHINE_CPUARCH} != "aarch64"
 SRCS+= vmbus_et.c hyperv_x86.c vmbus_x86.c
 .else
-SRC+= hyperv_aarch64.c vmbus_aarch64.c smccc_1_2_arm64.S
+SRC+= hyperv_aarch64.c vmbus_aarch64.c
 .endif
 SRCS+=	acpi_if.h bus_if.h device_if.h opt_acpi.h pci_if.h pcib_if.h vmbus_if.h
 
@@ -36,9 +36,6 @@ DPSRCS=	assym.inc
 vmbus_vector.o:
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
             ${.IMPSRC} -o ${.TARGET}
-smccc_1_2_arm64.o:
-	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
-			${.IMPSRC} -o ${.TARGET}
 
 CFLAGS+= -I${SRCTOP}/sys/dev/hyperv/include \
 	 -I${SRCTOP}/sys/dev/hyperv/vmbus
