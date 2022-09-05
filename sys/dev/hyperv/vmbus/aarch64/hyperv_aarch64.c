@@ -1,5 +1,5 @@
-/*-
- * Copyright (c) 2009-2012,2016-2017, 2022-2023 Microsoft Corp.
+/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright (c) 2009-2012,2016-2017, 2022 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
  * All rights reserved.
@@ -29,6 +29,7 @@
 /**
  * Implements low-level interactions with Hyper-V/Azure
  */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -51,30 +52,27 @@ __FBSDID("$FreeBSD$");
 
 
 void	hyperv_init_tc(void);
-int		hypercall_page_setup(vm_paddr_t);
+int	hypercall_page_setup(vm_paddr_t);
 void	hypercall_disable(void);
 bool	hyperv_identify_features(void);
 
-u_int               hyperv_ver_major;
+u_int	hyperv_ver_major;
+u_int	hyperv_features;
+u_int	hyperv_recommends;
 
-u_int               hyperv_features;
-u_int               hyperv_recommends;
-
-hyperv_tc64_t           hyperv_tc64;
+hyperv_tc64_t	hyperv_tc64;
 
 void
 hyperv_init_tc(void)
 {
 	hyperv_tc64 = NULL;
-	
 }
 
 int
 hypercall_page_setup(vm_paddr_t hc)
 {
 	return (0);
-}	
-
+}
 
 void
 hypercall_disable(void)
@@ -86,7 +84,6 @@ bool
 hyperv_identify_features(void)
 {
 	struct hv_get_vp_registers_output   result;
-	printf("Hyper-V identify for arm64\n");
 	vm_guest = VM_GUEST_HV;
 
 	hv_get_vpreg_128(CPUID_LEAF_HV_FEATURES, &result);

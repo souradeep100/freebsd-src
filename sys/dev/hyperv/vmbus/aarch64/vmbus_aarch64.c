@@ -1,5 +1,5 @@
-/*-
- * Copyright (c) 2009-2012,2016-2017, 2022-23  Microsoft Corp.
+/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright (c) 2009-2012,2016-2017, 2022 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
  * All rights reserved.
@@ -29,6 +29,7 @@
 /*
  * VM Bus Driver Implementation
  */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -70,7 +71,7 @@ __FBSDID("$FreeBSD$");
 #include "vmbus_if.h"
 
 
-static int			vmbus_handle_intr_new(void *);
+static int	vmbus_handle_intr_new(void *);
 
 
 void	vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
@@ -86,13 +87,13 @@ vmbus_handle_timer_intr1(struct vmbus_message *msg_base, struct trapframe *frame
 	// do nothing for arm64, as we are using generic timer
 	return;
 }
+
 static int
 vmbus_handle_intr_new(void *arg)
 {
 	vmbus_handle_intr(NULL);
 	return(FILTER_HANDLED);
 }
-
 
 void
 vmbus_synic_setup1(void *xsc)
@@ -105,7 +106,6 @@ vmbus_synic_teardown1(void)
 {
 	return;
 }
-
 
 int
 vmbus_setup_intr1(struct vmbus_softc *sc)
@@ -130,7 +130,6 @@ vmbus_setup_intr1(struct vmbus_softc *sc)
 		device_printf(sc->vmbus_dev, "failed to setup IRQ %d\n",err);
 		return (err);
 	}
-	device_printf(sc->vmbus_dev, "vmbus	IRQ is set\n");
 	irq_data = (struct intr_map_data_acpi *) rman_get_virtual(sc->ires);
 	device_printf(sc->vmbus_dev,"the irq %u\n",irq_data->irq); 
 	sc->vmbus_idtvec = irq_data->irq;

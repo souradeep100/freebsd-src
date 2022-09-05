@@ -1,5 +1,5 @@
-/*-
- * Copyright (c) 2009-2012,2016-2017, 2022-2023 Microsoft Corp.
+/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright (c) 2009-2012,2016-2017, 2022 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
  * All rights reserved.
@@ -54,12 +54,11 @@ __FBSDID("$FreeBSD$");
 #define HYPERV_FREEBSD_OSID		0ULL
 
 void	hyperv_init_tc(void);
-int		hypercall_page_setup(vm_paddr_t);
+int	hypercall_page_setup(vm_paddr_t);
 void	hypercall_disable(void);
 bool	hyperv_identify_features(void);
 
 u_int               hyperv_ver_major;
-
 u_int               hyperv_features;
 u_int               hyperv_recommends;
 

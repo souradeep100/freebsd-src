@@ -1,5 +1,5 @@
-/*-
- * Copyright (c) 2009-2012,2016-2017, 2022-2023 Microsoft Corp.
+/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * Copyright (c) 2009-2012,2016-2017, 2022 Microsoft Corp.
  * Copyright (c) 2012 NetApp Inc.
  * Copyright (c) 2012 Citrix Inc.
  * All rights reserved.
@@ -74,14 +74,11 @@ __FBSDID("$FreeBSD$");
 extern inthand_t IDTVEC(vmbus_isr), IDTVEC(vmbus_isr_pti);
 #define VMBUS_ISR_ADDR  trunc_page((uintptr_t)IDTVEC(vmbus_isr_pti))
 
-static int			vmbus_handle_intr_new(void *);
-
-
 void	vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
 		struct trapframe *frame);
 void	vmbus_synic_setup1(void *xsc);
 void	vmbus_synic_teardown1(void);
-int		vmbus_setup_intr1(struct vmbus_softc *sc);
+int	vmbus_setup_intr1(struct vmbus_softc *sc);
 void	vmbus_intr_teardown1(struct vmbus_softc *sc);
 
 void
@@ -90,39 +87,30 @@ vmbus_handle_timer_intr1(struct vmbus_message *msg_base, struct trapframe *frame
 	volatile struct vmbus_message *msg;
 	msg = msg_base + VMBUS_SINT_TIMER;
 	if (msg->msg_type == HYPERV_MSGTYPE_TIMER_EXPIRED) {
-	msg->msg_type = HYPERV_MSGTYPE_NONE;
-
-	vmbus_et_intr(frame);
-
-	/*
-	 * Make sure the write to msg_type (i.e. set to
-	 * HYPERV_MSGTYPE_NONE) happens before we read the
-	 * msg_flags and EOMing. Otherwise, the EOMing will
-	 * not deliver any more messages since there is no
-	 * empty slot
-	 *
-	 * NOTE:
-	 * mb() is used here, since atomic_thread_fence_seq_cst()
-	 * will become compiler fence on UP kernel.
-	 */
-	mb();
-	if (msg->msg_flags & VMBUS_MSGFLAG_PENDING) {
+		msg->msg_type = HYPERV_MSGTYPE_NONE;
+		vmbus_et_intr(frame);
 		/*
-		 * This will cause message queue rescan to possibly
-		 * deliver another msg from the hypervisor
+		 * Make sure the write to msg_type (i.e. set to
+		 * HYPERV_MSGTYPE_NONE) happens before we read the
+		 * msg_flags and EOMing. Otherwise, the EOMing will
+		 * not deliver any more messages since there is no
+		 * empty slot
+		 *
+		 * NOTE:
+		 * mb() is used here, since atomic_thread_fence_seq_cst()
+		 * will become compiler fence on UP kernel.
 		 */
-		wrmsr(MSR_HV_EOM, 0);
-	}
+		mb();
+		if (msg->msg_flags & VMBUS_MSGFLAG_PENDING) {
+			/*
+			 * This will cause message queue rescan to possibly
+			 * deliver another msg from the hypervisor
+			 */
+			wrmsr(MSR_HV_EOM, 0);
+		}
 	}
 	return;
 }
-static int
-vmbus_handle_intr_new(void *arg)
-{
-	// no operation in x86, just a stub
-	return(0);
-}
-
 
 void
 vmbus_synic_setup1(void *xsc)
@@ -150,7 +138,6 @@ vmbus_synic_teardown1(void)
 	WRMSR(sint, orig | MSR_HV_SINT_MASKED);
 	return;
 }
-
 
 int
 vmbus_setup_intr1(struct vmbus_softc *sc)

@@ -137,9 +137,6 @@ static void			vmbus_intr_teardown(struct vmbus_softc *);
 static int			vmbus_doattach(struct vmbus_softc *);
 static void			vmbus_event_proc_dummy(struct vmbus_softc *,
 				    int);
-#if defined(__aarch64__)
-static int			vmbus_handle_intr_new(void *);
-#endif /* for aarch64 */
 static struct vmbus_softc	*vmbus_sc;
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
@@ -958,7 +955,6 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		    vmbus_msg_task, sc);
 	}
 	return(vmbus_setup_intr1(sc));
-
 }
 static void
 vmbus_intr_teardown(struct vmbus_softc *sc)

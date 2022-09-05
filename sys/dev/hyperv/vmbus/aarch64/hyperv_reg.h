@@ -1,4 +1,4 @@
-/*-
+/*- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  * Copyright (c) 2022 Microsoft Corp.
  * All rights reserved.
  *
