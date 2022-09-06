@@ -34,15 +34,15 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/systm.h>
 #include <sys/timetc.h>
 
 #include <vm/vm.h>
+#include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
-#include <vm/pmap.h>
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
@@ -50,17 +50,16 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/aarch64/hyperv_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
+void hyperv_init_tc(void);
+int hypercall_page_setup(vm_paddr_t);
+void hypercall_disable(void);
+bool hyperv_identify_features(void);
 
-void	hyperv_init_tc(void);
-int	hypercall_page_setup(vm_paddr_t);
-void	hypercall_disable(void);
-bool	hyperv_identify_features(void);
+u_int hyperv_ver_major;
+u_int hyperv_features;
+u_int hyperv_recommends;
 
-u_int	hyperv_ver_major;
-u_int	hyperv_features;
-u_int	hyperv_recommends;
-
-hyperv_tc64_t	hyperv_tc64;
+hyperv_tc64_t hyperv_tc64;
 
 void
 hyperv_init_tc(void)
@@ -83,7 +82,7 @@ hypercall_disable(void)
 bool
 hyperv_identify_features(void)
 {
-	struct hv_get_vp_registers_output   result;
+	struct hv_get_vp_registers_output result;
 	vm_guest = VM_GUEST_HV;
 
 	hv_get_vpreg_128(CPUID_LEAF_HV_FEATURES, &result);

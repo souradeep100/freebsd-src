@@ -70,19 +70,18 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "vmbus_if.h"
 
+static int vmbus_handle_intr_new(void *);
 
-static int	vmbus_handle_intr_new(void *);
-
-
-void	vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
-		struct trapframe *frame);
-void	vmbus_synic_setup1(void *xsc);
-void	vmbus_synic_teardown1(void);
-int		vmbus_setup_intr1(struct vmbus_softc *sc);
-void	vmbus_intr_teardown1(struct vmbus_softc *sc);
+void vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
+    struct trapframe *frame);
+void vmbus_synic_setup1(void *xsc);
+void vmbus_synic_teardown1(void);
+int vmbus_setup_intr1(struct vmbus_softc *sc);
+void vmbus_intr_teardown1(struct vmbus_softc *sc);
 
 void
-vmbus_handle_timer_intr1(struct vmbus_message *msg_base, struct trapframe *frame)
+vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
+    struct trapframe *frame)
 {
 	// do nothing for arm64, as we are using generic timer
 	return;
@@ -92,7 +91,7 @@ static int
 vmbus_handle_intr_new(void *arg)
 {
 	vmbus_handle_intr(NULL);
-	return(FILTER_HANDLED);
+	return (FILTER_HANDLED);
 }
 
 void
@@ -114,24 +113,23 @@ vmbus_setup_intr1(struct vmbus_softc *sc)
 	struct intr_map_data_acpi *irq_data;
 
 	sc->ires = bus_alloc_resource_any(device_get_parent(sc->vmbus_dev),
-				SYS_RES_IRQ, &sc->vector, RF_ACTIVE | RF_SHAREABLE);
+	    SYS_RES_IRQ, &sc->vector, RF_ACTIVE | RF_SHAREABLE);
 	if (sc->ires == NULL) {
-		device_printf(sc->vmbus_dev,
-			"bus_alloc_resouce_any failed\n");
+		device_printf(sc->vmbus_dev, "bus_alloc_resouce_any failed\n");
 		return (ENXIO);
 	} else {
-		device_printf(sc->vmbus_dev,
-			"irq 0x%lx, vector %d end 0x%lx\n",
-		(uint64_t)rman_get_start(sc->ires), sc->vector, (uint64_t)rman_get_end(sc->ires));
+		device_printf(sc->vmbus_dev, "irq 0x%lx, vector %d end 0x%lx\n",
+		    (uint64_t)rman_get_start(sc->ires), sc->vector,
+		    (uint64_t)rman_get_end(sc->ires));
 	}
-	err = bus_setup_intr(sc->vmbus_dev, sc->ires, INTR_TYPE_MISC ,
-							 vmbus_handle_intr_new, NULL,  sc, &sc->icookie);
+	err = bus_setup_intr(sc->vmbus_dev, sc->ires, INTR_TYPE_MISC,
+	    vmbus_handle_intr_new, NULL, sc, &sc->icookie);
 	if (err) {
-		device_printf(sc->vmbus_dev, "failed to setup IRQ %d\n",err);
+		device_printf(sc->vmbus_dev, "failed to setup IRQ %d\n", err);
 		return (err);
 	}
-	irq_data = (struct intr_map_data_acpi *) rman_get_virtual(sc->ires);
-	device_printf(sc->vmbus_dev,"the irq %u\n",irq_data->irq); 
+	irq_data = (struct intr_map_data_acpi *)rman_get_virtual(sc->ires);
+	device_printf(sc->vmbus_dev, "the irq %u\n", irq_data->irq);
 	sc->vmbus_idtvec = irq_data->irq;
 	return 0;
 }
@@ -140,10 +138,10 @@ void
 vmbus_intr_teardown1(struct vmbus_softc *sc)
 {
 	int cpu;
-	
+
 	sc->vmbus_idtvec = -1;
 	bus_teardown_intr(sc->vmbus_dev, sc->ires, sc->icookie);
-	
+
 	CPU_FOREACH(cpu) {
 		if (VMBUS_PCPU_GET(sc, event_tq, cpu) != NULL) {
 			taskqueue_free(VMBUS_PCPU_GET(sc, event_tq, cpu));

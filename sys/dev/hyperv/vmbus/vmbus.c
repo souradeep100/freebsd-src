@@ -212,8 +212,7 @@ DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
 #if !defined(__aarch64__)
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
 #else
-DRIVER_MODULE(vmbus, vmbus_res, vmbus_driver,
-		NULL,NULL);
+DRIVER_MODULE(vmbus, vmbus_res, vmbus_driver, NULL, NULL);
 #endif
 
 MODULE_DEPEND(vmbus, acpi, 1, 1, 1);
@@ -716,10 +715,10 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 	critical_enter();
 
 	/*
-	 * Do a little interrupt counting. This used x86 specific 
+	 * Do a little interrupt counting. This used x86 specific
 	 * intrcnt_add function
 	 */
-#if !defined(__aarch64__) 
+#if !defined(__aarch64__)
 	(*VMBUS_PCPU_GET(sc, intr_cnt, cpu))++;
 #endif /* not for aarch64 */
 	vmbus_handle_intr1(sc, trap_frame, cpu);
@@ -729,7 +728,6 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 	 */
 	critical_exit();
 }
-
 
 static void
 vmbus_synic_setup(void *xsc)
@@ -752,18 +750,17 @@ vmbus_synic_setup(void *xsc)
 	 */
 	orig = RDMSR(MSR_HV_SIMP);
 	val = MSR_HV_SIMP_ENABLE | (orig & MSR_HV_SIMP_RSVD_MASK) |
-	    ((VMBUS_PCPU_GET(sc, message_dma.hv_paddr, cpu) >> PAGE_SHIFT) <<
-	     MSR_HV_SIMP_PGSHIFT);
+	    ((VMBUS_PCPU_GET(sc, message_dma.hv_paddr, cpu) >> PAGE_SHIFT)
+		<< MSR_HV_SIMP_PGSHIFT);
 	WRMSR(MSR_HV_SIMP, val);
 	/*
 	 * Setup the SynIC event flags.
 	 */
 	orig = RDMSR(MSR_HV_SIEFP);
 	val = MSR_HV_SIEFP_ENABLE | (orig & MSR_HV_SIEFP_RSVD_MASK) |
-	    ((VMBUS_PCPU_GET(sc, event_flags_dma.hv_paddr, cpu)
-	      >> PAGE_SHIFT) << MSR_HV_SIEFP_PGSHIFT);
+	    ((VMBUS_PCPU_GET(sc, event_flags_dma.hv_paddr, cpu) >> PAGE_SHIFT)
+		<< MSR_HV_SIEFP_PGSHIFT);
 	WRMSR(MSR_HV_SIEFP, val);
-
 
 	/*
 	 * Configure and unmask SINT for message and event flags.
@@ -954,7 +951,7 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		TASK_INIT(VMBUS_PCPU_PTR(sc, message_task, cpu), 0,
 		    vmbus_msg_task, sc);
 	}
-	return(vmbus_setup_intr1(sc));
+	return (vmbus_setup_intr1(sc));
 }
 static void
 vmbus_intr_teardown(struct vmbus_softc *sc)
@@ -1312,7 +1309,7 @@ vmbus_fb_mmio_res(device_t dev)
 		fb_height = efifb->fb_height;
 		fb_width = efifb->fb_width;
 	}
-#if !defined(__aarch64__) 
+#if !defined(__aarch64__)
 	else if (vbefb != NULL) {
 		fb_start = vbefb->fb_addr;
 		fb_end = vbefb->fb_addr + vbefb->fb_size;
@@ -1320,7 +1317,7 @@ vmbus_fb_mmio_res(device_t dev)
 		fb_height = vbefb->fb_height;
 		fb_width = vbefb->fb_width;
 	}
-#endif /* aarch64 */ 
+#endif /* aarch64 */
 	else {
 		if (bootverbose)
 			device_printf(dev,
@@ -1328,7 +1325,7 @@ vmbus_fb_mmio_res(device_t dev)
 		/* We are on Gen1 VM, just return. */
 		return;
 	}
-	
+
 	if (bootverbose)
 		device_printf(dev,
 		    "fb: fb_addr: %#jx, size: %#jx, "
@@ -1509,7 +1506,7 @@ vmbus_intrhook(void *xsc)
 	config_intrhook_disestablish(&sc->vmbus_intrhook);
 }
 
-#endif	/* EARLY_AP_STARTUP  aarch64 */
+#endif /* EARLY_AP_STARTUP  aarch64 */
 
 static int
 vmbus_attach(device_t dev)
@@ -1541,7 +1538,7 @@ vmbus_attach(device_t dev)
 	 */
 	if (!cold)
 		vmbus_doattach(vmbus_sc);
-#endif	/* EARLY_AP_STARTUP  and aarch64 */
+#endif /* EARLY_AP_STARTUP  and aarch64 */
 
 	return (0);
 }
@@ -1581,7 +1578,7 @@ vmbus_detach(device_t dev)
 
 #if defined(__aarch64__)
 	bus_release_resource(device_get_parent(dev), SYS_RES_IRQ, sc->vector,
-		sc->ires);
+	    sc->ires);
 #endif
 	return (0);
 }
@@ -1602,7 +1599,7 @@ vmbus_sysinit(void *arg __unused)
 	 * global cold set to zero, we just call the driver
 	 * initialization directly.
 	 */
-	if (!cold) 
+	if (!cold)
 		vmbus_doattach(sc);
 }
 /*

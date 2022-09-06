@@ -72,17 +72,18 @@ __FBSDID("$FreeBSD$");
 #include "vmbus_if.h"
 
 extern inthand_t IDTVEC(vmbus_isr), IDTVEC(vmbus_isr_pti);
-#define VMBUS_ISR_ADDR  trunc_page((uintptr_t)IDTVEC(vmbus_isr_pti))
+#define VMBUS_ISR_ADDR trunc_page((uintptr_t)IDTVEC(vmbus_isr_pti))
 
-void	vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
-		struct trapframe *frame);
-void	vmbus_synic_setup1(void *xsc);
-void	vmbus_synic_teardown1(void);
-int	vmbus_setup_intr1(struct vmbus_softc *sc);
-void	vmbus_intr_teardown1(struct vmbus_softc *sc);
+void vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
+    struct trapframe *frame);
+void vmbus_synic_setup1(void *xsc);
+void vmbus_synic_teardown1(void);
+int vmbus_setup_intr1(struct vmbus_softc *sc);
+void vmbus_intr_teardown1(struct vmbus_softc *sc);
 
 void
-vmbus_handle_timer_intr1(struct vmbus_message *msg_base, struct trapframe *frame)
+vmbus_handle_timer_intr1(struct vmbus_message *msg_base,
+    struct trapframe *frame)
 {
 	volatile struct vmbus_message *msg;
 	msg = msg_base + VMBUS_SINT_TIMER;
@@ -122,7 +123,7 @@ vmbus_synic_setup1(void *xsc)
 	sint = MSR_HV_SINT0 + VMBUS_SINT_TIMER;
 	orig = RDMSR(sint);
 	val = sc->vmbus_idtvec | MSR_HV_SINT_AUTOEOI |
-		(orig & MSR_HV_SINT_RSVD_MASK);
+	    (orig & MSR_HV_SINT_RSVD_MASK);
 	WRMSR(sint, val);
 	return;
 }
@@ -150,8 +151,8 @@ vmbus_setup_intr1(struct vmbus_softc *sc)
 	 * All Hyper-V ISR required resources are setup, now let's find a
 	 * free IDT vector for Hyper-V ISR and set it up.
 	 */
-	sc->vmbus_idtvec = lapic_ipi_alloc(pti ? IDTVEC(vmbus_isr_pti) :
-		IDTVEC(vmbus_isr));
+	sc->vmbus_idtvec = lapic_ipi_alloc(
+	    pti ? IDTVEC(vmbus_isr_pti) : IDTVEC(vmbus_isr));
 	if (sc->vmbus_idtvec < 0) {
 #if defined(__amd64__) && defined(KLD_MODULE)
 		pmap_pti_remove_kva(VMBUS_ISR_ADDR, VMBUS_ISR_ADDR + PAGE_SIZE);
@@ -161,7 +162,7 @@ vmbus_setup_intr1(struct vmbus_softc *sc)
 	}
 	if (bootverbose) {
 		device_printf(sc->vmbus_dev, "vmbus IDT vector %d\n",
-			sc->vmbus_idtvec);
+		    sc->vmbus_idtvec);
 	}
 	return 0;
 }
@@ -178,8 +179,8 @@ vmbus_intr_teardown1(struct vmbus_softc *sc)
 
 #if defined(__amd64__) && defined(KLD_MODULE)
 	pmap_pti_remove_kva(VMBUS_ISR_ADDR, VMBUS_ISR_ADDR + PAGE_SIZE);
-#endif	
-	
+#endif
+
 	CPU_FOREACH(cpu) {
 		if (VMBUS_PCPU_GET(sc, event_tq, cpu) != NULL) {
 			taskqueue_free(VMBUS_PCPU_GET(sc, event_tq, cpu));

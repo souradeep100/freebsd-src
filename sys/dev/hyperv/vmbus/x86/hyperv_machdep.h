@@ -31,10 +31,10 @@
 
 #include <sys/param.h>
 
-uint64_t	hypercall_md(volatile void *hc_addr, uint64_t in_val,
-				uint64_t in_paddr, uint64_t out_paddr);
+uint64_t hypercall_md(volatile void *hc_addr, uint64_t in_val,
+    uint64_t in_paddr, uint64_t out_paddr);
 
 #define WRMSR(msr, val) wrmsr(msr, val)
 #define RDMSR(msr) rdmsr(msr)
 
-#endif	/* !_HYPERV_MACHDEP_H_ */
+#endif /* !_HYPERV_MACHDEP_H_ */

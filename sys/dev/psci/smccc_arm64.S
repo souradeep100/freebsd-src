@@ -64,13 +64,13 @@ END(arm_smccc_smc)
 /* arm_smccc_1_2_hvc(const struct arm_smccc_1_2_regs *args,
                 struct arm_smccc_1_2_regs *res) */
 ENTRY(arm_smccc_1_2_hvc)
-	stp     x1, x19, [sp, #-16]!
+	stp	x1, x19, [sp, #-16]!
 	mov	x19, x0
 	ldp	x0, x1, [x19, #16 * 0]
 	ldp	x2, x3, [x19, #16 * 1]
-	ldp	x4, x5,  [x19, #16 * 2]
-	ldp	x6, x7,  [x19, #16 * 3]
-	ldp	x8, x9,  [x19, #16 * 4]
+	ldp	x4, x5, [x19, #16 * 2]
+	ldp	x6, x7, [x19, #16 * 3]
+	ldp	x8, x9, [x19, #16 * 4]
 	ldp	x10, x11, [x19, #16 * 5]
 	ldp	x12, x13, [x19, #16 * 6]
 	ldp	x14, x15, [x19, #16 * 7]
@@ -80,9 +80,9 @@ ENTRY(arm_smccc_1_2_hvc)
 	cbz	x19, 1f
 	stp	x0, x1, [x19, #16 * 0]
 	stp	x2, x3, [x19, #16 * 1]
-	stp	x4, x5,  [x19, #16 * 2]
-	stp	x6, x7,  [x19, #16 * 3]
-	stp	x8, x9,  [x19, #16 * 4]
+	stp	x4, x5, [x19, #16 * 2]
+	stp	x6, x7, [x19, #16 * 3]
+	stp	x8, x9, [x19, #16 * 4]
 	stp	x10, x11, [x19, #16 * 5]
 	stp	x12, x13, [x19, #16 * 6]
 	stp	x14, x15, [x19, #16 * 7]
