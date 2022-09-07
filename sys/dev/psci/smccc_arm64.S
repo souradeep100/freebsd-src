@@ -33,37 +33,28 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
-/*
- * int arm_smccc_hvc(register_t, register_t, register_t, register_t,
- *     register_t, register_t, register_t, register_t,
- *     struct arm_smccc_res *res)
- */
-ENTRY(arm_smccc_hvc)
-	hvc	#0
+.macro arm_smccc_1_0	insn
+ENTRY(arm_smccc_\insn)
+	\insn	#0
 	ldr	x4, [sp]
 	cbz	x4, 1f
 	stp	x0, x1, [x4, #16 * 0]
 	stp	x2, x3, [x4, #16 * 1]
 1:	ret
-END(arm_smccc_hvc)
+END(arm_smccc_\insn)
+.endm
 
 /*
- * int arm_smccc_smc(register_t, register_t, register_t, register_t,
+ * int arm_smccc_*(register_t, register_t, register_t, register_t,
  *     register_t, register_t, register_t, register_t,
  *     struct arm_smccc_res *res)
  */
-ENTRY(arm_smccc_smc)
-	smc	#0
-	ldr	x4, [sp]
-	cbz	x4, 1f
-	stp	x0, x1, [x4, #16 * 0]
-	stp	x2, x3, [x4, #16 * 1]
-1:	ret
-END(arm_smccc_smc)
-
+arm_smccc_1_0	hvc
+arm_smccc_1_0	smc
 /* arm_smccc_1_2_hvc(const struct arm_smccc_1_2_regs *args,
                 struct arm_smccc_1_2_regs *res) */
-ENTRY(arm_smccc_1_2_hvc)
+.macro arm_smccc_1_2	insn
+ENTRY(arm_smccc_1_2_\insn)
 	stp	x1, x19, [sp, #-16]!
 	mov	x19, x0
 	ldp	x0, x1, [x19, #16 * 0]
@@ -89,4 +80,9 @@ ENTRY(arm_smccc_1_2_hvc)
 	stp	x16, x17, [x19, #16 * 8]
 	ldp	xzr, x19, [sp], #16
 1:	ret
-END(arm_smccc_1_2_hvc)
+END(arm_smccc_1_2\insn)
+/* int arm_smccc_1_2_*(const struct arm_smccc_1_2_regs *args,
+ *     struct arm_smccc_1_2_regs *res) 
+ */$
+arm_smccc_1_2	hvc
+arm_smccc_1_2	smc
