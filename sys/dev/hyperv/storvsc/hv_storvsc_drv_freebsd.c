@@ -1831,17 +1831,16 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 	for (i = 0; i < nsegs; i++) {
 #ifdef INVARIANTS
 		if (nsegs > 1) {
+#if defined(__amd64__)
 			if (i == 0) {
-#if !defined(__aarch64__)
 				KASSERT((segs[i].ds_addr & PAGE_MASK) +
 				    segs[i].ds_len == PAGE_SIZE,
 				    ("invalid 1st page, ofs 0x%jx, len %zu",
 				     (uintmax_t)segs[i].ds_addr,
 				     segs[i].ds_len));
-#else
-				/* do nothing for arm64 */
-#endif	
-			} else if (i == nsegs - 1) {
+			} else
+#endif
+			if (i == nsegs - 1) {
 				KASSERT((segs[i].ds_addr & PAGE_MASK) == 0,
 				    ("invalid last page, ofs 0x%jx",
 				     (uintmax_t)segs[i].ds_addr));
@@ -1858,18 +1857,17 @@ storvsc_xferbuf_prepare(void *arg, bus_dma_segment_t *segs, int nsegs, int error
 	}
 	reqp->prp_cnt = nsegs;
 
-#if defined(__aarch64__)
 	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
 		bus_dmasync_op_t op;
-		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
+
+		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN)
 			op = BUS_DMASYNC_PREREAD;
-		} else {
+		else
 			op = BUS_DMASYNC_PREWRITE;
-		}
+
 		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
 		    reqp->data_dmap, op);
 	}
-#endif
 }
 
 /**
@@ -2130,7 +2128,6 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 	int ori_sg_count = 0;
 	const struct scsi_generic *cmd;
 
-#if defined(__aarch64__)
 	if ((ccb->ccb_h.flags & CAM_DIR_MASK) != CAM_DIR_NONE) {
 		bus_dmasync_op_t op;
 
@@ -2139,10 +2136,11 @@ storvsc_io_done(struct hv_storvsc_request *reqp)
 		else
 			op = BUS_DMASYNC_POSTWRITE;
 
-		bus_dmamap_sync(sc->storvsc_req_dtag, reqp->data_dmap, op);
+		bus_dmamap_sync(reqp->softc->storvsc_req_dtag,
+		    reqp->data_dmap, op);
 		bus_dmamap_unload(sc->storvsc_req_dtag, reqp->data_dmap);
 	}
-#endif /* aarch64 */
+
 	/* destroy bounce buffer if it is used */
 	if (reqp->bounce_sgl_count) {
 		ori_sglist = (bus_dma_segment_t *)ccb->csio.data_ptr;
