@@ -51,8 +51,7 @@ END(arm_smccc_\insn)
  */
 arm_smccc_1_0	hvc
 arm_smccc_1_0	smc
-/* arm_smccc_1_2_hvc(const struct arm_smccc_1_2_regs *args,
-                struct arm_smccc_1_2_regs *res) */
+
 .macro arm_smccc_1_2	insn
 ENTRY(arm_smccc_1_2_\insn)
 	stp	x1, x19, [sp, #-16]!
@@ -66,7 +65,7 @@ ENTRY(arm_smccc_1_2_\insn)
 	ldp	x12, x13, [x19, #16 * 6]
 	ldp	x14, x15, [x19, #16 * 7]
 	ldp	x16, x17, [x19, #16 * 8]
-	hvc	#0
+	\insn	#0
 	ldr	x19, [sp]
 	cbz	x19, 1f
 	stp	x0, x1, [x19, #16 * 0]

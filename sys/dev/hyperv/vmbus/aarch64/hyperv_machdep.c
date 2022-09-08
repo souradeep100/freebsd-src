@@ -51,12 +51,10 @@ __FBSDID("$FreeBSD$");
 void
 arm_hv_set_vreg(u32 msr, u64 value)
 {
-	struct arm_smccc_res res;
-
 	arm_smccc_hvc(HV_FUNC_ID,
 	    HVCALL_SET_VP_REGISTERS | HV_HYPERCALL_FAST_BIT |
 		HV_HYPERCALL_REP_COMP_1,
-	    HV_PARTITION_ID_SELF, HV_VP_INDEX_SELF, msr, 0, value, 0, &res);
+	    HV_PARTITION_ID_SELF, HV_VP_INDEX_SELF, msr, 0, value, 0, NULL);
 }
 
 void

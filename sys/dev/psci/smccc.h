@@ -114,4 +114,6 @@ struct arm_smccc_1_2_regs {
 
 int arm_smccc_1_2_hvc(const struct arm_smccc_1_2_regs *args,
     struct arm_smccc_1_2_regs *res);
+int arm_smccc_1_2_smc(const struct arm_smccc_1_2_regs *args,
+    struct arm_smccc_1_2_regs *res);
 #endif /* _PSCI_SMCCC_H_ */
