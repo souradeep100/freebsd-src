@@ -374,7 +374,7 @@ toolchain-metadata.mk: .PHONY .META
 .if !empty(SUBDIR_OVERRIDE)
 SUBDIR=	${SUBDIR_OVERRIDE}
 .else
-SUBDIR=	lib libexec
+SUBDIR=	lib libexec ebpf
 # Add LOCAL_LIB_DIRS, but only if they will not be picked up as a SUBDIR
 # of a LOCAL_DIRS directory.  This allows LOCAL_DIRS=foo and
 # LOCAL_LIB_DIRS=foo/lib to behave as expected.
@@ -2801,7 +2801,8 @@ NXBMAKEARGS+= \
 	MK_SSP=no \
 	MK_TESTS=no \
 	MK_WERROR=no \
-	MK_ZFS=no
+	MK_ZFS=no \
+	MK_EBPF=yes
 
 NXBMAKEENV+= \
 	MAKEOBJDIRPREFIX=
@@ -3027,6 +3028,8 @@ _generic_libs+= ${_DIR}
 .endfor
 
 lib/libopie__L lib/libtacplus__L: lib/libmd__L
+
+
 
 .if ${MK_CDDL} != "no"
 _cddl_lib_libumem= cddl/lib/libumem
