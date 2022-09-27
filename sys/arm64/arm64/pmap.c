@@ -1247,7 +1247,7 @@ pmap_init_asids(struct asid_set *set, int bits)
 	 * bit_alloc().
 	 */
 	set->asid_set_size = 1 << set->asid_bits;
-	set->asid_set = (bitstr_t *)kmem_malloc(bitstr_size(set->asid_set_size),
+	set->asid_set = kmem_malloc(bitstr_size(set->asid_set_size),
 	    M_WAITOK | M_ZERO);
 	for (i = 0; i < ASID_FIRST_AVAILABLE; i++)
 		bit_set(set->asid_set, i);
@@ -1326,7 +1326,7 @@ pmap_init(void)
 	 */
 	s = (vm_size_t)(pv_npg * sizeof(struct md_page));
 	s = round_page(s);
-	pv_table = (struct md_page *)kmem_malloc(s, M_WAITOK | M_ZERO);
+	pv_table = kmem_malloc(s, M_WAITOK | M_ZERO);
 	for (i = 0; i < pv_npg; i++)
 		TAILQ_INIT(&pv_table[i].pv_list);
 	TAILQ_INIT(&pv_dummy.pv_list);
@@ -3893,6 +3893,8 @@ pmap_enter_largepage(pmap_t pmap, vm_offset_t va, pt_entry_t newpte, int flags,
 
 restart:
 	if (psind == 2) {
+		PMAP_ASSERT_L1_BLOCKS_SUPPORTED;
+
 		l0p = pmap_l0(pmap, va);
 		if ((pmap_load(l0p) & ATTR_DESCR_VALID) == 0) {
 			mp = _pmap_alloc_l3(pmap, pmap_l0_pindex(va), NULL);
@@ -3917,10 +3919,9 @@ restart:
 				mp->ref_count++;
 			}
 		}
-		KASSERT((origpte & ~ATTR_MASK) == (newpte & ~ATTR_MASK) ||
-		    (L1_BLOCKS_SUPPORTED &&
-		    (origpte & ATTR_DESCR_MASK) == L1_BLOCK &&
-		    (origpte & ATTR_DESCR_VALID) == 0),
+		KASSERT(((origpte & ~ATTR_MASK) == (newpte & ~ATTR_MASK) &&
+		    (origpte & ATTR_DESCR_MASK) == L1_BLOCK) ||
+		    (origpte & ATTR_DESCR_VALID) == 0,
 		    ("va %#lx changing 1G phys page l1 %#lx newpte %#lx",
 		    va, origpte, newpte));
 		pmap_store(l1p, newpte);
@@ -4555,7 +4556,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
     vm_prot_t prot, vm_page_t mpte, struct rwlock **lockp)
 {
 	pd_entry_t *pde;
-	pt_entry_t *l2, *l3, l3_val;
+	pt_entry_t *l1, *l2, *l3, l3_val;
 	vm_paddr_t pa;
 	int lvl;
 
@@ -4583,31 +4584,33 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 			mpte->ref_count++;
 		} else {
 			/*
-			 * Get the l2 entry
-			 */
-			pde = pmap_pde(pmap, va, &lvl);
-
-			/*
 			 * If the page table page is mapped, we just increment
 			 * the hold count, and activate it.  Otherwise, we
-			 * attempt to allocate a page table page.  If this
-			 * attempt fails, we don't retry.  Instead, we give up.
+			 * attempt to allocate a page table page, passing NULL
+			 * instead of the PV list lock pointer because we don't
+			 * intend to sleep.  If this attempt fails, we don't
+			 * retry.  Instead, we give up.
 			 */
-			if (lvl == 1) {
-				l2 = pmap_l1_to_l2(pde, va);
-				if ((pmap_load(l2) & ATTR_DESCR_MASK) ==
-				    L2_BLOCK)
+			l1 = pmap_l1(pmap, va);
+			if (l1 != NULL && pmap_load(l1) != 0) {
+				if ((pmap_load(l1) & ATTR_DESCR_MASK) ==
+				    L1_BLOCK)
 					return (NULL);
-			}
-			if (lvl == 2 && pmap_load(pde) != 0) {
-				mpte =
-				    PHYS_TO_VM_PAGE(pmap_load(pde) & ~ATTR_MASK);
-				mpte->ref_count++;
+				l2 = pmap_l1_to_l2(l1, va);
+				if (pmap_load(l2) != 0) {
+					if ((pmap_load(l2) & ATTR_DESCR_MASK) ==
+					    L2_BLOCK)
+						return (NULL);
+					mpte = PHYS_TO_VM_PAGE(pmap_load(l2) &
+					    ~ATTR_MASK);
+					mpte->ref_count++;
+				} else {
+					mpte = _pmap_alloc_l3(pmap, l2pindex,
+					    NULL);
+					if (mpte == NULL)
+						return (mpte);
+				}
 			} else {
-				/*
-				 * Pass NULL instead of the PV list lock
-				 * pointer, because we don't intend to sleep.
-				 */
 				mpte = _pmap_alloc_l3(pmap, l2pindex, NULL);
 				if (mpte == NULL)
 					return (mpte);
@@ -5804,10 +5807,6 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 			continue;
 		if ((pmap_load(l1) & ATTR_DESCR_MASK) == L1_BLOCK) {
 			PMAP_ASSERT_L1_BLOCKS_SUPPORTED;
-			KASSERT(va_next <= eva,
-			    ("partial update of non-transparent 1G page "
-			    "l1 %#lx sva %#lx eva %#lx va_next %#lx",
-			    pmap_load(l1), sva, eva, va_next));
 			continue;
 		}
 
@@ -6095,15 +6094,16 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 }
 
 void
-pmap_unmapbios(vm_offset_t va, vm_size_t size)
+pmap_unmapbios(void *p, vm_size_t size)
 {
 	struct pmap_preinit_mapping *ppim;
-	vm_offset_t offset, tmpsize, va_trunc;
+	vm_offset_t offset, tmpsize, va, va_trunc;
 	pd_entry_t *pde;
 	pt_entry_t *l2;
 	int i, lvl, l2_blocks, block;
 	bool preinit_map;
 
+	va = (vm_offset_t)p;
 	l2_blocks =
 	   (roundup2(va + size, L2_SIZE) - rounddown2(va, L2_SIZE)) >> L2_SHIFT;
 	KASSERT(l2_blocks > 0, ("pmap_unmapbios: invalid size %lx", size));

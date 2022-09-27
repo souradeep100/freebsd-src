@@ -82,7 +82,7 @@ ENTRY(arm_smccc_1_2_\insn)
 END(arm_smccc_1_2\insn)
 .endm
 /* int arm_smccc_1_2_*(const struct arm_smccc_1_2_regs *args,
- *     struct arm_smccc_1_2_regs *res) 
+ *     struct arm_smccc_1_2_regs *res)
  */
 arm_smccc_1_2	hvc
 arm_smccc_1_2	smc
