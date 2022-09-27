@@ -35,15 +35,8 @@ __FBSDID("$FreeBSD$");
 #include <efilib.h>
 
 #include "loader_efi.h"
-#include "platform/acfreebsd.h"
-#include "acconfig.h"
-#define ACPI_SYSTEM_XFACE
-#include "actypes.h"
-#include "actbl.h"
 
 static EFI_GUID serial = SERIAL_IO_PROTOCOL;
-static EFI_GUID acpi_guid = ACPI_TABLE_GUID;
-static EFI_GUID acpi20_guid = ACPI_20_TABLE_GUID;
 
 #define	COMC_TXWAIT	0x40000		/* transmit timeout */
 
@@ -262,20 +255,7 @@ comc_probe(struct console *sc)
 	unsigned val;
 	char *env, *buf, *ep;
 	size_t sz;
-	ACPI_TABLE_RSDP *rsdp;
-	ACPI_TABLE_XSDT *xsdt;
-	
-	rsdp = efi_get_table(&acpi20_guid);
-	if (rsdp == NULL) {
-		rsdp = efi_get_table(&acpi_guid);
-	}
-	if (rsdp != NULL) {
-		xsdt = (ACPI_TABLE_XSDT*)ptov(rsdp->XsdtPhysicalAddress);
-		if (strncmp("VRTUAL", xsdt->Header.OemId, strlen(xsdt->Header.OemId)) == 0
-			&& strncmp("MICROSFT", xsdt->Header.OemTableId,
-			strlen(xsdt->Header.OemTableId)) == 0)
-			return;
-	}
+
 	if (comc_port == NULL) {
 		comc_port = malloc(sizeof (struct serial));
 		if (comc_port == NULL)
