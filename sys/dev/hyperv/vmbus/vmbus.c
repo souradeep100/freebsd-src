@@ -209,11 +209,7 @@ static driver_t vmbus_driver = {
 };
 
 DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
-#if !defined(__aarch64__)
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
-#else
-DRIVER_MODULE(vmbus, vmbus_res, vmbus_driver, NULL, NULL);
-#endif
 
 MODULE_DEPEND(vmbus, acpi, 1, 1, 1);
 MODULE_DEPEND(vmbus, pci, 1, 1, 1);

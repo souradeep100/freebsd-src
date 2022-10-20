@@ -627,3 +627,4 @@ dev/hyperv/utilities/hv_kvp.c			optional   hyperv
 dev/hyperv/netvsc/hn_nvs.c				optional	hyperv
 dev/hyperv/netvsc/hn_rndis.c			optional	hyperv
 dev/hyperv/netvsc/if_hn.c				optional	hyperv
+dev/hyperv/pcib/vmbus_pcib.c                          optional        hyperv pci

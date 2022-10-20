@@ -63,8 +63,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcib_private.h>
 #include "pcib_if.h"
 
-#include <machine/intr_machdep.h>
-#include <x86/apicreg.h>
+//#include <machine/intr_machdep.h>
+//#include <x86/apicreg.h>
 
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
@@ -231,6 +231,15 @@ struct hv_msi_desc {
 	uint64_t	cpu_mask;
 } __packed;
 
++struct hv_msi_desc3 {
+	uint32_t	vector;
+	uint8_t		delivery_mode;
+	uint8_t		reserved;
+	uint16_t	vector_count;
+	uint16_t	processor_count;
+	uint16_t	processor_array[32];
+} __packed;
+
 struct tran_int_desc {
 	uint16_t	reserved;
 	uint16_t	vector_count;
@@ -307,6 +316,12 @@ struct pci_create_interrupt {
 	struct pci_message message_type;
 	union win_slot_encoding wslot;
 	struct hv_msi_desc int_desc;
+} __packed;
+
+struct pci_create_interrupt3 {
+	struct pci_message message_type;
+	union win_slot_encoding wslot;
+	struct hv_msi_desc3 int_desc;
 } __packed;
 
 struct pci_create_int_response {
@@ -1765,9 +1780,9 @@ vmbus_pcib_release_msix(device_t pcib, device_t dev, int irq)
 	return (PCIB_RELEASE_MSIX(device_get_parent(pcib), dev, irq));
 }
 
-#define	MSI_INTEL_ADDR_DEST	0x000ff000
+#define	MSI_INTEL_ADDR_DEST	0x00000000
 #define	MSI_INTEL_DATA_INTVEC	IOART_INTVEC	/* Interrupt vector. */
-#define	MSI_INTEL_DATA_DELFIXED	IOART_DELFIXED
+#define	MSI_INTEL_DATA_DELFIXED 0x0
 
 static int
 vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
@@ -1810,9 +1825,9 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 		}
 	}
 
-	cpu = (v_addr & MSI_INTEL_ADDR_DEST) >> 12;
+	cpu = (v_addr ) >> 12;
 	vcpu_id = VMBUS_GET_VCPU_ID(device_get_parent(pcib), pcib, cpu);
-	vector = v_data & MSI_INTEL_DATA_INTVEC;
+	vector = v_data;
 
 	init_completion(&comp.comp_pkt.host_event);
 
