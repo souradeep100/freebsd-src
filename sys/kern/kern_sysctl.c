@@ -136,7 +136,7 @@ sysctl_find_oidname(const char *name, struct sysctl_oid_list *list)
 	struct sysctl_oid *oidp;
 
 	SYSCTL_ASSERT_LOCKED();
-	RB_FOREACH(oidp, sysctl_oid_list, list) {
+	SYSCTL_FOREACH(oidp, list) {
 		if (strcmp(oidp->oid_name, name) == 0) {
 			return (oidp);
 		}
@@ -347,7 +347,7 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 /*
  * Locate the path to a given oid.  Returns the length of the resulting path,
  * or -1 if the oid was not found.  nodes must have room for CTL_MAXNAME
- * elements and be NULL initialized.
+ * elements.
  */
 static int
 sysctl_search_oid(struct sysctl_oid **nodes, struct sysctl_oid *needle)
@@ -356,29 +356,34 @@ sysctl_search_oid(struct sysctl_oid **nodes, struct sysctl_oid *needle)
 
 	SYSCTL_ASSERT_LOCKED();
 	indx = 0;
-	while (indx < CTL_MAXNAME && indx >= 0) {
-		if (nodes[indx] == NULL && indx == 0)
-			nodes[indx] = RB_MIN(sysctl_oid_list,
-			    &sysctl__children);
-		else if (nodes[indx] == NULL)
-			nodes[indx] = RB_MIN(sysctl_oid_list,
-			    &nodes[indx - 1]->oid_children);
-		else
-			nodes[indx] = RB_NEXT(sysctl_oid_list,
-			    &nodes[indx - 1]->oid_children, nodes[indx]);
-
+	/*
+	 * Do a depth-first search of the oid tree, looking for 'needle'. Start
+	 * with the first child of the root.
+	 */
+	nodes[indx] = RB_MIN(sysctl_oid_list, &sysctl__children);
+	for (;;) {
 		if (nodes[indx] == needle)
 			return (indx + 1);
 
 		if (nodes[indx] == NULL) {
-			indx--;
+			/* Node has no more siblings, so back up to parent. */
+			if (indx-- == 0) {
+				/* Retreat to root, so give up. */
+				break;
+			}
+		} else if ((nodes[indx]->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
+			/* Node has children. */
+			if (++indx == CTL_MAXNAME) {
+				/* Max search depth reached, so give up. */
+				break;
+			}
+			/* Start with the first child. */
+			nodes[indx] = RB_MIN(sysctl_oid_list,
+			    &nodes[indx - 1]->oid_children);
 			continue;
 		}
-
-		if ((nodes[indx]->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
-			indx++;
-			continue;
-		}
+		/* Consider next sibling. */
+		nodes[indx] = RB_NEXT(sysctl_oid_list, NULL, nodes[indx]);
 	}
 	return (-1);
 }
@@ -396,7 +401,6 @@ sysctl_warn_reuse(const char *func, struct sysctl_oid *leaf)
 
 	sbuf_printf(&sb, "%s: can't re-use a leaf (", __func__);
 
-	memset(nodes, 0, sizeof(nodes));
 	rc = sysctl_search_oid(nodes, leaf);
 	if (rc > 0) {
 		for (i = 0; i < rc; i++)
@@ -479,10 +483,9 @@ sysctl_register_oid(struct sysctl_oid *oidp)
 	/*
 	 * Insert the OID into the parent's list sorted by OID number.
 	 */
-retry:
 	key.oid_number = oid_number;
-	p = RB_FIND(sysctl_oid_list, parent, &key);
-	if (p) {
+	p = RB_NFIND(sysctl_oid_list, parent, &key);
+	while (p != NULL && oid_number == p->oid_number) {
 		/* get the next valid OID number */
 		if (oid_number < CTL_AUTO_START ||
 		    oid_number == 0x7fffffff) {
@@ -491,10 +494,12 @@ retry:
 			/* don't loop forever */
 			if (!timeout--)
 				panic("sysctl: Out of OID numbers\n");
-			goto retry;
-		} else {
-			oid_number++;
+			key.oid_number = oid_number;
+			p = RB_NFIND(sysctl_oid_list, parent, &key);
+			continue;
 		}
+		p = RB_NEXT(sysctl_oid_list, NULL, p);
+		oid_number++;
 	}
 	/* check for non-auto OID number collision */
 	if (oidp->oid_number >= 0 && oidp->oid_number < CTL_AUTO_START &&
@@ -1005,7 +1010,7 @@ sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 	struct sysctl_oid *oidp;
 
 	SYSCTL_ASSERT_LOCKED();
-	RB_FOREACH(oidp, sysctl_oid_list, l) {
+	SYSCTL_FOREACH(oidp, l) {
 		for (k=0; k<i; k++)
 			printf(" ");
 
@@ -1320,17 +1325,11 @@ name2oid(char *name, int *oid, int *len, struct sysctl_oid **oidpp)
 {
 	struct sysctl_oid *oidp;
 	struct sysctl_oid_list *lsp = &sysctl__children;
-	char *p;
 
 	SYSCTL_ASSERT_LOCKED();
 
 	for (*len = 0; *len < CTL_MAXNAME;) {
-		p = strsep(&name, ".");
-
-		RB_FOREACH(oidp, sysctl_oid_list, lsp) {
-			if (strcmp(p, oidp->oid_name) == 0)
-				break;
-		}
+		oidp = sysctl_find_oidname(strsep(&name, "."), lsp);
 		if (oidp == NULL)
 			return (ENOENT);
 		*oid++ = oidp->oid_number;
@@ -2766,12 +2765,12 @@ static void
 db_show_oid_name(int *oid, size_t nlen)
 {
 	struct sysctl_oid *oidp;
-	int qoid[CTL_MAXNAME+2];
+	int qoid[CTL_MAXNAME + 2];
 	int error;
 
-	qoid[0] = 0;
+	qoid[0] = CTL_SYSCTL;
+	qoid[1] = CTL_SYSCTL_NAME;
 	memcpy(qoid + 2, oid, nlen * sizeof(int));
-	qoid[1] = 1;
 
 	error = sysctl_find_oid(qoid, nlen + 2, &oidp, NULL, NULL);
 	if (error)
@@ -2857,25 +2856,24 @@ static int
 db_show_sysctl_all(int *oid, size_t len, int flags)
 {
 	struct sysctl_oid *oidp;
-	int name1[CTL_MAXNAME + 2], name2[CTL_MAXNAME + 2];
-	size_t l1, l2;
+	int qoid[CTL_MAXNAME + 2], next[CTL_MAXNAME];
+	size_t nlen;
 
-	name1[0] = CTL_SYSCTL;
-	name1[1] = CTL_SYSCTL_NEXT;
-	l1 = 2;
+	qoid[0] = CTL_SYSCTL;
+	qoid[1] = CTL_SYSCTL_NEXT;
 	if (len) {
-		memcpy(name1 + 2, oid, len * sizeof(int));
-		l1 += len;
+		nlen = len;
+		memcpy(&qoid[2], oid, nlen * sizeof(int));
 	} else {
-		name1[2] = CTL_KERN;
-		l1++;
+		nlen = 1;
+		qoid[2] = CTL_KERN;
 	}
 	for (;;) {
-		int i, error;
+		int error;
+		size_t nextsize = sizeof(next);
 
-		l2 = sizeof(name2);
-		error = kernel_sysctl(kdb_thread, name1, l1,
-		    name2, &l2, NULL, 0, &l2, 0);
+		error = kernel_sysctl(kdb_thread, qoid, nlen + 2,
+		    next, &nextsize, NULL, 0, &nlen, 0);
 		if (error != 0) {
 			if (error == ENOENT)
 				return (0);
@@ -2883,27 +2881,25 @@ db_show_sysctl_all(int *oid, size_t len, int flags)
 				db_error("sysctl(next)");
 		}
 
-		l2 /= sizeof(int);
+		nlen /= sizeof(int);
 
-		if (l2 < (unsigned int)len)
+		if (nlen < (unsigned int)len)
 			return (0);
 
-		for (i = 0; i < len; i++)
-			if (name2[i] != oid[i])
-				return (0);
+		if (memcmp(&oid[0], &next[0], len * sizeof(int)) != 0)
+			return (0);
 
 		/* Find the OID in question */
-		error = sysctl_find_oid(name2, l2, &oidp, NULL, NULL);
+		error = sysctl_find_oid(next, nlen, &oidp, NULL, NULL);
 		if (error)
 			return (error);
 
-		i = db_show_oid(oidp, name2, l2, flags | DB_SYSCTL_SAFE_ONLY);
+		(void)db_show_oid(oidp, next, nlen, flags | DB_SYSCTL_SAFE_ONLY);
 
 		if (db_pager_quit)
 			return (0);
 
-		memcpy(name1+2, name2, l2 * sizeof(int));
-		l1 = 2 + l2;
+		memcpy(&qoid[2 + len], &next[len], (nlen - len) * sizeof(int));
 	}
 }
 

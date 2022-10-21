@@ -999,29 +999,29 @@ findpcb:
 			goto dropunlock;
 	}
 
-	/*
-	 * A previous connection in TIMEWAIT state is supposed to catch stray
-	 * or duplicate segments arriving late.  If this segment was a
-	 * legitimate new connection attempt, the old INPCB gets removed and
-	 * we can try again to find a listening socket.
-	 */
-	if (inp->inp_flags & INP_TIMEWAIT) {
+	tp = intotcpcb(inp);
+	switch (tp->t_state) {
+	case TCPS_TIME_WAIT:
+		/*
+		 * A previous connection in TIMEWAIT state is supposed to catch
+		 * stray or duplicate segments arriving late.  If this segment
+		 * was a legitimate new connection attempt, the old INPCB gets
+		 * removed and we can try again to find a listening socket.
+		 */
 		tcp_dooptions(&to, optp, optlen,
 		    (thflags & TH_SYN) ? TO_SYN : 0);
 		/*
-		 * NB: tcp_twcheck unlocks the INP and frees the mbuf.
+		 * tcp_twcheck unlocks the inp always, and frees the m if fails.
 		 */
 		if (tcp_twcheck(inp, &to, th, m, tlen))
 			goto findpcb;
 		return (IPPROTO_DONE);
-	}
-	/*
-	 * The TCPCB may no longer exist if the connection is winding
-	 * down or it is in the CLOSED state.  Either way we drop the
-	 * segment and send an appropriate response.
-	 */
-	tp = intotcpcb(inp);
-	if (tp == NULL || tp->t_state == TCPS_CLOSED) {
+	case TCPS_CLOSED:
+		/*
+		 * The TCPCB may no longer exist if the connection is winding
+		 * down or it is in the CLOSED state.  Either way we drop the
+		 * segment and send an appropriate response.
+		 */
 		rstreason = BANDLIM_RST_CLOSEDPORT;
 		goto dropwithreset;
 	}
@@ -1614,6 +1614,10 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * XXX: This should be done after segment
 	 * validation to ignore broken/spoofed segs.
 	 */
+	if  (tp->t_idle_reduce &&
+	     (tp->snd_max == tp->snd_una) &&
+	     ((ticks - tp->t_rcvtime) >= tp->t_rxtcur))
+		cc_after_idle(tp);
 	tp->t_rcvtime = ticks;
 
 	if (thflags & TH_FIN)
@@ -1888,11 +1892,21 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 					    &tcp_savetcp, 0);
 #endif
 				TCP_PROBE3(debug__input, tp, th, m);
+				/*
+				 * Clear t_acktime if remote side has ACKd
+				 * all data in the socket buffer.
+				 * Otherwise, update t_acktime if we received
+				 * a sufficiently large ACK.
+				 */
+				if (sbavail(&so->so_snd) == 0)
+					tp->t_acktime = 0;
+				else if (acked > 1)
+					tp->t_acktime = ticks;
 				if (tp->snd_una == tp->snd_max)
 					tcp_timer_activate(tp, TT_REXMT, 0);
 				else if (!tcp_timer_active(tp, TT_PERSIST))
 					tcp_timer_activate(tp, TT_REXMT,
-						      tp->t_rxtcur);
+					    TP_RXTCUR(tp));
 				sowwakeup(so);
 				if (sbavail(&so->so_snd))
 					(void) tcp_output(tp);
@@ -2091,6 +2105,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			 */
 			tp->t_starttime = ticks;
 			if (tp->t_flags & TF_NEEDFIN) {
+				tp->t_acktime = ticks;
 				tcp_state_change(tp, TCPS_FIN_WAIT_1);
 				tp->t_flags &= ~TF_NEEDFIN;
 				thflags &= ~TH_SYN;
@@ -2228,6 +2243,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tp = tcp_drop(tp, ECONNRESET);
 			rstreason = BANDLIM_UNLIMITED;
 		} else {
+			tcp_ecn_input_syn_sent(tp, thflags, iptos);
 			/* Send challenge ACK. */
 			tcp_respond(tp, mtod(m, void *), th, m, tp->rcv_nxt,
 			    tp->snd_nxt, TH_ACK);
@@ -2475,6 +2491,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tp->t_tfo_pending = NULL;
 		}
 		if (tp->t_flags & TF_NEEDFIN) {
+			tp->t_acktime = ticks;
 			tcp_state_change(tp, TCPS_FIN_WAIT_1);
 			tp->t_flags &= ~TF_NEEDFIN;
 		} else {
@@ -2921,6 +2938,20 @@ process_ACK:
 			tcp_xmit_timer(tp, ticks - tp->t_rtttime);
 		}
 
+		SOCKBUF_LOCK(&so->so_snd);
+		/*
+		 * Clear t_acktime if remote side has ACKd all data in the
+		 * socket buffer and FIN (if applicable).
+		 * Otherwise, update t_acktime if we received a sufficiently
+		 * large ACK.
+		 */
+		if ((tp->t_state <= TCPS_CLOSE_WAIT &&
+		    acked == sbavail(&so->so_snd)) ||
+		    acked > sbavail(&so->so_snd))
+			tp->t_acktime = 0;
+		else if (acked > 1)
+			tp->t_acktime = ticks;
+
 		/*
 		 * If all outstanding data is acked, stop retransmit
 		 * timer and remember to restart (more output or persist).
@@ -2931,14 +2962,16 @@ process_ACK:
 			tcp_timer_activate(tp, TT_REXMT, 0);
 			needoutput = 1;
 		} else if (!tcp_timer_active(tp, TT_PERSIST))
-			tcp_timer_activate(tp, TT_REXMT, tp->t_rxtcur);
+			tcp_timer_activate(tp, TT_REXMT, TP_RXTCUR(tp));
 
 		/*
 		 * If no data (only SYN) was ACK'd,
 		 *    skip rest of ACK processing.
 		 */
-		if (acked == 0)
+		if (acked == 0) {
+			SOCKBUF_UNLOCK(&so->so_snd);
 			goto step6;
+		}
 
 		/*
 		 * Let the congestion control algorithm update congestion
@@ -2947,7 +2980,6 @@ process_ACK:
 		 */
 		cc_ack_received(tp, th, nsegs, CC_ACK);
 
-		SOCKBUF_LOCK(&so->so_snd);
 		if (acked > sbavail(&so->so_snd)) {
 			if (tp->snd_wnd >= sbavail(&so->so_snd))
 				tp->snd_wnd -= sbavail(&so->so_snd);
@@ -2999,10 +3031,6 @@ process_ACK:
 				 * Starting the timer is contrary to the
 				 * specification, but if we don't get a FIN
 				 * we'll hang forever.
-				 *
-				 * XXXjl:
-				 * we should release the tp also, and use a
-				 * compressed state.
 				 */
 				if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 					soisdisconnected(so);
