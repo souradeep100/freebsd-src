@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/x86/hyperv_machdep.h>
 #include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #endif
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
 #define HYPERV_FREEBSD_BUILD		0ULL

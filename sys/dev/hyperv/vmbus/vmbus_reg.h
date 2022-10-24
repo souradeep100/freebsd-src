@@ -37,6 +37,7 @@
 #else
 #include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #endif
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 
 /*
  * Hyper-V SynIC message format.

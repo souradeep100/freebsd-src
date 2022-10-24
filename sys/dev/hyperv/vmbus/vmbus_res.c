@@ -39,23 +39,10 @@ __FBSDID("$FreeBSD$");
 
 #include "acpi_if.h"
 #include "bus_if.h"
-#include "pcib_if.h"
 
 static int		vmbus_res_probe(device_t);
 static int		vmbus_res_attach(device_t);
 static int		vmbus_res_detach(device_t);
-#if defined(__aarch64__)
-static int          acpi_syscont_alloc_msi(device_t, device_t,
-                    int count, int maxcount, int *irqs);
-static int          acpi_syscont_release_msi(device_t bus, device_t dev,
-                    int count, int *irqs);
-static int          acpi_syscont_alloc_msix(device_t bus, device_t dev,
-                    int *irq);
-static int          acpi_syscont_release_msix(device_t bus, device_t dev,
-                    int irq);
-static int          acpi_syscont_map_msi(device_t bus, device_t dev,
-                    int irq, uint64_t *addr, uint32_t *data);
-#endif /* aarch64 */
 
 static device_method_t vmbus_res_methods[] = {
 	/* Device interface */
@@ -65,18 +52,7 @@ static device_method_t vmbus_res_methods[] = {
 	DEVMETHOD(device_shutdown,		bus_generic_shutdown),
 	DEVMETHOD(device_suspend,		bus_generic_suspend),
 	DEVMETHOD(device_resume,		bus_generic_resume),
-#if defined(__aarch64__)
-	DEVMETHOD(bus_setup_intr,		bus_generic_setup_intr),
-	DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
-	DEVMETHOD(bus_release_resource, bus_generic_release_resource),
-	DEVMETHOD(bus_teardown_intr,    bus_generic_teardown_intr),
-    /* pcib interface */
-    DEVMETHOD(pcib_alloc_msi,       acpi_syscont_alloc_msi),
-    DEVMETHOD(pcib_release_msi,     acpi_syscont_release_msi),
-    DEVMETHOD(pcib_alloc_msix,      acpi_syscont_alloc_msix),
-    DEVMETHOD(pcib_release_msix,    acpi_syscont_release_msix),
-    DEVMETHOD(pcib_map_msi,     acpi_syscont_map_msi),
-#endif /* aarch64 */
+
 	DEVMETHOD_END
 };
 
@@ -108,65 +84,13 @@ vmbus_res_probe(device_t dev)
 static int
 vmbus_res_attach(device_t dev __unused)
 {
-#if defined(__aarch64__)
-	bus_generic_probe(dev);
-	return(bus_generic_attach(dev));
-#endif /* aarch64 */
+
 	return (0);
 }
 
 static int
 vmbus_res_detach(device_t dev __unused)
 {
-#if defined(__aarch64__)
-	int error;
-	error = bus_generic_detach(dev);
-	if (error)
-		return (error);
-#endif
+
 	return (0);
 }
-#if defined(__aarch64__)
-static int
-acpi_syscont_alloc_msi(device_t bus, device_t dev, int count, int maxcount,
-    int *irqs)
-{
-    device_t parent = device_get_parent(bus);
-
-    return (PCIB_ALLOC_MSI(device_get_parent(parent), dev, count, maxcount,
-    irqs));
-}
-
-static int
-acpi_syscont_release_msi(device_t bus, device_t dev, int count, int *irqs)
-{
-    device_t parent = device_get_parent(bus);
-
-    return (PCIB_RELEASE_MSI(device_get_parent(parent), dev, count, irqs));
-}
-
-static int
-acpi_syscont_alloc_msix(device_t bus, device_t dev, int *irq)
-{
-    device_t parent = device_get_parent(bus);
-
-    return (PCIB_ALLOC_MSIX(device_get_parent(parent), dev, irq));
-}
-
-static int
-acpi_syscont_release_msix(device_t bus, device_t dev, int irq)
-{
-    device_t parent = device_get_parent(bus);
-
-    return (PCIB_RELEASE_MSIX(device_get_parent(parent), dev, irq));
-}
-
-static int
-acpi_syscont_map_msi(device_t bus, device_t dev, int irq, uint64_t *addr,
-    uint32_t *data)
-{
-    device_t parent = device_get_parent(bus);
-
-    return (PCIB_MAP_MSI(device_get_parent(parent), dev, irq, addr, data));
-}
-#endif /* aarch64 */

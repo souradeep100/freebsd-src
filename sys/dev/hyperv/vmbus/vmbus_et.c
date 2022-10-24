@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 
 #define VMBUS_ET_NAME			"hvet"
 

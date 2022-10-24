@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/x86/hyperv_machdep.h>
 #include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 
 struct hyperv_reftsc_ctx {
 	struct hyperv_reftsc	*tsc_ref;

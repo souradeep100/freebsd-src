@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/hyperv/vmbus/vmbus_reg.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
 #include <dev/hyperv/vmbus/vmbus_chanvar.h>
+#include <dev/hyperv/vmbus/hyperv_common_reg.h>
 #include "acpi_if.h"
 #include "pcib_if.h"
 #include "vmbus_if.h"
@@ -209,11 +210,7 @@ static driver_t vmbus_driver = {
 };
 
 DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
-#if !defined(__aarch64__)
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
-#else
-DRIVER_MODULE(vmbus, vmbus_res, vmbus_driver, NULL, NULL);
-#endif
 
 MODULE_DEPEND(vmbus, acpi, 1, 1, 1);
 MODULE_DEPEND(vmbus, pci, 1, 1, 1);
