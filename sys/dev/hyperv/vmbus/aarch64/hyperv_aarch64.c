@@ -94,4 +94,3 @@ hyperv_identify_features(void)
 	hyperv_recommends = result.as32.a;
 	return (true);
 }
-
