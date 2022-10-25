@@ -1077,6 +1077,7 @@ vmbus_release_msi(device_t bus, device_t dev, int count, int *irqs)
 static int
 vmbus_alloc_msix(device_t bus, device_t dev, int *irq)
 {
+	device_printf(bus,"vmbus_alloc_msix is calling PCIB_ALLOC_MSIX\n");
 
 	return (PCIB_ALLOC_MSIX(device_get_parent(bus), dev, irq));
 }

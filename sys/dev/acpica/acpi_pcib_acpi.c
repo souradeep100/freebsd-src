@@ -657,6 +657,7 @@ acpi_pcib_alloc_msix(device_t pcib, device_t dev, int *irq)
 	device_t bus;
 
 	bus = device_get_parent(pcib);
+	device_printf(bus,"acpi_pcib_alloc_msix is called\n");
 	return (PCIB_ALLOC_MSIX(device_get_parent(bus), dev, irq));
 }
 

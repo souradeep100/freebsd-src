@@ -801,13 +801,16 @@ pci_enable_msix(struct pci_dev *pdev, struct msix_entry *entries, int nreq)
 		return avail;
 	}
 	avail = nreq;
-	if ((error = -pci_alloc_msix(pdev->dev.bsddev, &avail)) != 0)
+	if ((error = -pci_alloc_msix(pdev->dev.bsddev, &avail)) != 0) {
+		printf("pci_enable_msix error is %d\n",error);
 		return error;
+	}
 	/*
 	 * Handle case where "pci_alloc_msix()" may allocate less
 	 * interrupts than available and return with no error:
 	 */
 	if (avail < nreq) {
+		printf("pci_enable_msix avail %d and nreq %d\n",avail, nreq);
 		pci_release_msi(pdev->dev.bsddev);
 		return avail;
 	}
@@ -834,6 +837,7 @@ pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
 		return (-ERANGE);
 
 	do {
+		printf("pci_enable_msix_range\n");
 		rc = pci_enable_msix(dev, entries, nvec);
 		if (rc < 0) {
 			return (rc);

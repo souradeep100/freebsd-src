@@ -231,7 +231,7 @@ struct hv_msi_desc {
 	uint64_t	cpu_mask;
 } __packed;
 
-+struct hv_msi_desc3 {
+struct hv_msi_desc3 {
 	uint32_t	vector;
 	uint8_t		delivery_mode;
 	uint8_t		reserved;

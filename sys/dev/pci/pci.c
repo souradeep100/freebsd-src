@@ -1816,17 +1816,22 @@ pci_alloc_msix_method(device_t dev, device_t child, int *count)
 
 	/* If rid 0 is allocated, then fail. */
 	rle = resource_list_find(&dinfo->resources, SYS_RES_IRQ, 0);
-	if (rle != NULL && rle->res != NULL)
+	if (rle != NULL && rle->res != NULL) {
+		device_printf(dev,"pci_alloc_msix_method resource_list_find failing \n");
 		return (ENXIO);
-
+	}
 	/* Already have allocated messages? */
-	if (cfg->msi.msi_alloc != 0 || cfg->msix.msix_alloc != 0)
+	if (cfg->msi.msi_alloc != 0 || cfg->msix.msix_alloc != 0) {
+		device_printf(dev,"pci_alloc_msix_method cfg->msi.msi_alloc %d and cfg->msix.msix_alloc %d\n",
+				cfg->msi.msi_alloc, cfg->msix.msix_alloc);
 		return (ENXIO);
+	}
 
 	/* If MSI-X is blacklisted for this system, fail. */
-	if (pci_msix_blacklisted())
+	if (pci_msix_blacklisted()) {
+		device_printf(dev,"pci_alloc_msix_method pci_msix_blacklisted true\n");
 		return (ENXIO);
-
+	}
 	/* MSI-X capability present? */
 	if (cfg->msix.msix_location == 0 || !pci_do_msix)
 		return (ENODEV);
@@ -1835,15 +1840,18 @@ pci_alloc_msix_method(device_t dev, device_t child, int *count)
 	rle = resource_list_find(&dinfo->resources, SYS_RES_MEMORY,
 	    cfg->msix.msix_table_bar);
 	if (rle == NULL || rle->res == NULL ||
-	    !(rman_get_flags(rle->res) & RF_ACTIVE))
+	    !(rman_get_flags(rle->res) & RF_ACTIVE)) {
+		device_printf(dev,"pci_alloc_msix_method rman_get_flags not active \n");
 		return (ENXIO);
+	}
 	cfg->msix.msix_table_res = rle->res;
 	if (cfg->msix.msix_pba_bar != cfg->msix.msix_table_bar) {
 		rle = resource_list_find(&dinfo->resources, SYS_RES_MEMORY,
 		    cfg->msix.msix_pba_bar);
 		if (rle == NULL || rle->res == NULL ||
-		    !(rman_get_flags(rle->res) & RF_ACTIVE))
+		    !(rman_get_flags(rle->res) & RF_ACTIVE)) {
 			return (ENXIO);
+		}
 	}
 	cfg->msix.msix_pba_res = rle->res;
 
@@ -1856,6 +1864,7 @@ pci_alloc_msix_method(device_t dev, device_t child, int *count)
 		/* Allocate a message. */
 		error = PCIB_ALLOC_MSIX(device_get_parent(dev), child, &irq);
 		if (error) {
+			device_printf(dev,"PCIB_ALLOC_MSIX failed\n");
 			if (i == 0)
 				return (error);
 			break;

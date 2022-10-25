@@ -2796,6 +2796,7 @@ pcib_alloc_msix(device_t pcib, device_t dev, int *irq)
 	struct pcib_softc *sc = device_get_softc(pcib);
 	device_t bus;
 
+	device_printf(pcib,"pcib_alloc_msix from pci_pci.c is called\n");
 	if (sc->flags & PCIB_DISABLE_MSIX)
 		return (ENXIO);
 	bus = device_get_parent(pcib);
