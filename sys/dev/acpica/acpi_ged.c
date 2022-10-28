@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 
 /* Hooks for the ACPI CA debugging infrastructure */
-#define _COMPONENT ACPI_GED
+#define _COMPONENT ACPI_BUS
 ACPI_MODULE_NAME("GED")
 
 static MALLOC_DEFINE(M_ACPIGED, "acpiged", "ACPI Generic event data");
@@ -198,7 +198,7 @@ acpi_ged_attach(device_t dev)
 			}
 		}
 #else
-		rawirq = rman_get_start(sc->evt[i].r);
+		rawirq = rman_get_start(sc->evts[i].r);
 		trig = INTR_TRIGGER_LEVEL;
 		if (ACPI_SUCCESS(acpi_lookup_irq_resource
 				(dev, sc->evts[i].rid,
