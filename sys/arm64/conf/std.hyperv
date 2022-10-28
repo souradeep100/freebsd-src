@@ -2,5 +2,6 @@
 # Hyper-V support (Hyper-v Gen 2)
 #
 
+device		acpi
 #hyper-v support
-device      hyperv
+device		hyperv
