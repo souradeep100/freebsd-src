@@ -86,25 +86,25 @@ hypercall_disable(void)
 static int
 get_hypervid(void)
 {
-    ACPI_TABLE_FADT *fadt;
-    vm_paddr_t physaddr;
-    uint64_t hypervid;
+	ACPI_TABLE_FADT *fadt;
+	vm_paddr_t physaddr;
+	uint64_t hypervid;
 	int ret;
 
-    physaddr = acpi_find_table(ACPI_SIG_FADT);
-    if (physaddr == 0)
-        return (0);
+	physaddr = acpi_find_table(ACPI_SIG_FADT);
+	if (physaddr == 0)
+		return (0);
 
-    fadt = acpi_map_table(physaddr, ACPI_SIG_FADT);
-    if (fadt == NULL) {
-        printf("hyperv: Unable to map the FADT\n");
-        return (0);
-    }
+	fadt = acpi_map_table(physaddr, ACPI_SIG_FADT);
+	if (fadt == NULL) {
+		printf("hyperv: Unable to map the FADT\n");
+		return (0);
+	}
 
-    hypervid = fadt->HypervisorId;
-    acpi_unmap_table(fadt);
+	hypervid = fadt->HypervisorId;
+	acpi_unmap_table(fadt);
 	ret = strncmp((char *)&hypervid, "MsHyperV", 8);
-    return (ret);
+	return (ret);
 }
 
 bool
