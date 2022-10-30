@@ -659,8 +659,8 @@ _sdhci_fdt=	sdhci_fdt
 .endif
 _e6000sw=	e6000sw
 _neta=		neta
-_hyperv=  hyperv
 .endif
+
 .if ${MACHINE_CPUARCH} == "aarch64"
 _hyperv=  hyperv
 .endif
