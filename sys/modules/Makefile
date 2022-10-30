@@ -164,6 +164,7 @@ SUBDIR=	\
 	if_tuntap \
 	if_vlan \
 	if_vxlan \
+	${_if_wg} \
 	iflib \
 	${_igc} \
 	imgact_binmisc \
@@ -417,10 +418,8 @@ _autofs=	autofs
 .endif
 
 .if ${MK_DTRACE} != "no" || defined(ALL_MODULES)
-.if ${MACHINE_CPUARCH} != "arm" || ${MACHINE_ARCH:Marmv[67]*} != ""
 .if ${KERN_OPTS:MKDTRACE_HOOKS}
 SUBDIR+=	dtrace
-.endif
 .endif
 SUBDIR+=	opensolaris
 .endif
@@ -451,6 +450,9 @@ _toecore=	toecore
 _if_enc=	if_enc
 _if_gif=	if_gif
 _if_gre=	if_gre
+.if ${MK_CRYPT} != "no" || defined(ALL_MODULES)
+_if_wg=		if_wg
+.endif
 _ipfw_pmod=	ipfw_pmod
 .if ${KERN_OPTS:MIPSEC_SUPPORT} && !${KERN_OPTS:MIPSEC}
 _ipsec=		ipsec
@@ -630,11 +632,6 @@ SUBDIR+=	tests
 SUBDIR+=	zfs
 .endif
 
-.if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "arm" && \
-	${MACHINE_CPUARCH} != "powerpc" && ${MACHINE_CPUARCH} != "riscv"
-_syscons=	syscons
-.endif
-
 .if ${MK_SOURCELESS_UCODE} != "no"
 _cxgb=		cxgb
 .endif
@@ -643,6 +640,7 @@ _cxgb=		cxgb
 _armv8crypto=	armv8crypto
 _dpaa2=		dpaa2
 _em=		em
+_hyperv=  hyperv
 
 .if !empty(OPT_FDT)
 _allwinner=	allwinner
@@ -696,6 +694,7 @@ _mgb=		mgb
 _nctgpio=	nctgpio
 _ntb=		ntb
 _ocs_fc=	ocs_fc
+_p2sb=		p2sb
 _qat=		qat
 _qatfw=		qatfw
 _qat_c2xxx=	qat_c2xxx
@@ -706,7 +705,7 @@ _rdma=		rdma
 _safe=		safe
 _speaker=	speaker
 _splash=	splash
-_p2sb=		p2sb
+_syscons=	syscons
 _wbwd=		wbwd
 
 _aac=		aac
@@ -853,9 +852,7 @@ _nvram=		opal_nvram
 _nvram+=	powermac_nvram
 .endif
 
-.endif
-
-.if ${MACHINE_ARCH:Marmv[67]*} != "" || ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "aarch64"
 _bcm283x_clkman=  bcm283x_clkman
 _bcm283x_pwm=  bcm283x_pwm
 .endif
@@ -871,6 +868,8 @@ SUBDIR+=${MODULES_EXTRA}
 .for reject in ${WITHOUT_MODULES}
 SUBDIR:= ${SUBDIR:N${reject}}
 .endfor
+
+.endif # MODULES_OVERRIDE -- Keep last
 
 # Calling kldxref(8) for each module is expensive.
 .if !defined(NO_XREF)
