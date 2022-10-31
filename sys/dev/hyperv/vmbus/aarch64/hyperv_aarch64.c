@@ -93,12 +93,12 @@ get_hypervid(void)
 
 	physaddr = acpi_find_table(ACPI_SIG_FADT);
 	if (physaddr == 0)
-		return (0);
+		return (1);
 
 	fadt = acpi_map_table(physaddr, ACPI_SIG_FADT);
 	if (fadt == NULL) {
 		printf("hyperv: Unable to map the FADT\n");
-		return (0);
+		return (1);
 	}
 
 	hypervid = fadt->HypervisorId;
