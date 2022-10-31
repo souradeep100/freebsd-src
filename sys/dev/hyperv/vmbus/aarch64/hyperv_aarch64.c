@@ -57,7 +57,7 @@ int hypercall_page_setup(vm_paddr_t);
 void hypercall_disable(void);
 bool hyperv_identify_features(void);
 
-static int get_hypervid(void);
+static bool is_hyperv(void);
 
 u_int hyperv_ver_major;
 u_int hyperv_features;
@@ -88,8 +88,8 @@ hypercall_disable(void)
  * To do that we are using ACPI FADT and for that, acpi
  * fadt is mapped first.
  */
-static int
-get_hypervid(void)
+static bool
+is_hyperv(void)
 {
 	ACPI_TABLE_FADT *fadt;
 	vm_paddr_t physaddr;
@@ -98,17 +98,17 @@ get_hypervid(void)
 
 	physaddr = acpi_find_table(ACPI_SIG_FADT);
 	if (physaddr == 0)
-		return (1);
+		return (false);
 
 	fadt = acpi_map_table(physaddr, ACPI_SIG_FADT);
 	if (fadt == NULL) {
 		printf("hyperv: Unable to map the FADT\n");
-		return (1);
+		return (false);
 	}
 
 	hypervid = fadt->HypervisorId;
 	acpi_unmap_table(fadt);
-	ret = strncmp((char *)&hypervid, "MsHyperV", 8);
+	ret = strncmp((char *)&hypervid, "MsHyperV", 8) == 0 ? true : false;
 	return (ret);
 }
 
@@ -119,11 +119,13 @@ hyperv_identify_features(void)
 
 	if (resource_disabled("acpi", 0))
 		return (false);
-	if (get_hypervid())
+	if (!is_hyperv())
 		return (false);
-	else
-		vm_guest = VM_GUEST_HV;
 
+	vm_guest = VM_GUEST_HV;
+	/* use MSRs to get the hyperv specific
+	 * attributes.
+	 */
 	hv_get_vpreg_128(CPUID_LEAF_HV_FEATURES, &result);
 	hyperv_features = result.as32.a;
 	hv_get_vpreg_128(CPUID_LEAF_HV_IDENTITY, &result);
