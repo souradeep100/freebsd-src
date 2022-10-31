@@ -83,6 +83,11 @@ hypercall_disable(void)
 	return;
 }
 
+/*
+ * This function verifies if the platform is Hyper-V or not.
+ * To do that we are using ACPI FADT and for that, acpi
+ * fadt is mapped first.
+ */
 static int
 get_hypervid(void)
 {
