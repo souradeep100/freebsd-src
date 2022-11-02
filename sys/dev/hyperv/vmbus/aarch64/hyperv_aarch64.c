@@ -94,7 +94,7 @@ is_hyperv(void)
 	ACPI_TABLE_FADT *fadt;
 	vm_paddr_t physaddr;
 	uint64_t hypervid;
-	int ret;
+	bool ret;
 
 	physaddr = acpi_find_table(ACPI_SIG_FADT);
 	if (physaddr == 0)
