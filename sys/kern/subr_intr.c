@@ -82,7 +82,7 @@ __FBSDID("$FreeBSD$");
 #include "msi_if.h"
 
 #define	INTRNAME_LEN	(2*MAXCOMLEN + 1)
-
+#define DEBUG
 #ifdef DEBUG
 #define debugf(fmt, args...) do { printf("%s(): ", __func__);	\
     printf(fmt,##args); } while (0)
@@ -1440,18 +1440,23 @@ intr_alloc_msix(device_t pci, device_t child, intptr_t xref, int *irq)
 	 * interrupt controller to map memory the msi source will need.
 	 */
 	err = MSI_IOMMU_INIT(pic->pic_dev, child, &domain);
-	if (err != 0)
+	if (err != 0) {
+		printf("MSI_IOMMU_INIT failed %d\n",err);
 		return (err);
+	}
 
 	err = MSI_ALLOC_MSIX(pic->pic_dev, child, &pdev, &isrc);
-	if (err != 0)
+	if (err != 0) {
+		printf("MSI_ALLOC_MSIX failed %d %s\n",err, device_get_name(pic->pic_dev));
 		return (err);
+	}
 
 	isrc->isrc_iommu = domain;
 	msi = (struct intr_map_data_msi *)intr_alloc_map_data(
 		    INTR_MAP_DATA_MSI, sizeof(*msi), M_WAITOK | M_ZERO);
 	msi->isrc = isrc;
 	*irq = intr_map_irq(pic->pic_dev, xref, (struct intr_map_data *)msi);
+	printf("MSI intr alloc is successfull %x\n", *irq);
 	return (0);
 }
 

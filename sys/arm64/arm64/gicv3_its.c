@@ -2014,12 +2014,15 @@ EARLY_DRIVER_MODULE(its_acpi, gic, gicv3_its_acpi_driver, 0, 0,
 static int
 gicv3_its_acpi_probe(device_t dev)
 {
-
-	if (gic_get_bus(dev) != GIC_BUS_ACPI)
+	device_printf(dev, "gicv3_its_acpi_probe called \n");
+	if (gic_get_bus(dev) != GIC_BUS_ACPI) {
+		device_printf(dev, "gicv3_its_acpi_probe failed\n");		
 		return (EINVAL);
-
-	if (gic_get_hw_rev(dev) < 3)
+	}
+	if (gic_get_hw_rev(dev) < 3) {
+		device_printf(dev, "gicv3_its_acpi_probe failed for hw_rev\n");
 		return (EINVAL);
+	}
 
 	device_set_desc(dev, "ARM GIC Interrupt Translation Service");
 	return (BUS_PROBE_DEFAULT);
@@ -2035,6 +2038,7 @@ gicv3_its_acpi_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	err = gicv3_its_attach(dev);
+	device_printf(dev, "gicv3_its_acpi_attach is called\n");
 	if (err != 0)
 		return (err);
 

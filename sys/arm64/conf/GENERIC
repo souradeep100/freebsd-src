@@ -23,7 +23,6 @@ ident		GENERIC
 include		"std.arm64"
 include		"std.dev"
 options		COMPAT_LINUXKPI
-
 device      xz
 
 device		mlx5

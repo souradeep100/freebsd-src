@@ -1552,6 +1552,7 @@ gic_v3_gic_alloc_msix(device_t dev, u_int mbi_start, u_int mbi_count,
 	}
 	/* No free interrupt was found */
 	if (irq == mbi_start + mbi_count) {
+		printf("gic_v3_gic_alloc_msix failing from here\n");
 		mtx_unlock(&sc->gic_mbi_mtx);
 		return (ENXIO);
 	}
@@ -1616,11 +1617,13 @@ gic_v3_alloc_msix(device_t dev, device_t child, device_t *pic,
 	int error;
 
 	sc = device_get_softc(dev);
+	printf("gic_v3_alloc_msix is called\n");
 	error = gic_v3_gic_alloc_msix(dev, sc->gic_mbi_start,
 	    sc->gic_mbi_end - sc->gic_mbi_start, isrc);
-	if (error != 0)
+	if (error != 0) {
+		printf("gic_v3_alloc_msix failed %d\n",error);
 		return (error);
-
+	}
 	*pic = dev;
 
 	return (0);
