@@ -320,6 +320,9 @@ gic_v3_acpi_attach(device_t dev)
 	if (err != 0)
 		goto count_error;
 
+	sc->gic_mbi_start = 64;
+	sc->gic_mbi_end = 920;
+
 	err = gic_v3_attach(dev);
 	if (err != 0)
 		goto error;
@@ -330,7 +333,10 @@ gic_v3_acpi_attach(device_t dev)
 		err = ENXIO;
 		goto error;
 	}
-
+	err = intr_msi_register(dev, ACPI_MSI_XREF);
+	if (err) {
+		device_printf(dev, "could not register MSI\n");
+	}
 	if (intr_pic_claim_root(dev, ACPI_INTR_XREF, arm_gic_v3_intr, sc,
 	    GIC_LAST_SGI - GIC_FIRST_SGI + 1) != 0) {
 		err = ENXIO;
