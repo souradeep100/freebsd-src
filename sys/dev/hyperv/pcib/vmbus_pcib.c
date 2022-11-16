@@ -348,9 +348,9 @@ struct pci_resources_assigned {
 struct pci_resources_assigned2 {
     struct pci_message message_type;
     union win_slot_encoding wslot;
-    u8 memory_range[0x14][6];   /* not used here */
-    u32 msi_descriptor_count;
-    u8 reserved[70];
+    uint8_t memory_range[0x14][6];   /* not used here */
+    uint32_t msi_descriptor_count;
+    uint8_t reserved[70];
 } __packed;
 
 struct pci_create_interrupt {
@@ -639,7 +639,7 @@ hv_pci_delete_device(struct hv_pci_dev *hpdev)
 }
 
 static struct hv_pci_dev *
-new_pcichild_device(struct hv_pcibus *hbus, struct pci_func_desc *desc)
+new_pcichild_device(struct hv_pcibus *hbus, struct pci_func_desc2 *desc)
 {
 	struct hv_pci_dev *hpdev;
 	struct pci_child_message *res_req;
@@ -823,7 +823,7 @@ pci_devices_present_work(void *arg, int pending __unused)
 	struct hv_pcibus *hbus;
 	uint32_t child_no;
 	bool found;
-	struct pci_func_desc *new_desc;
+	struct pci_func_desc2 *new_desc;
 	struct hv_pci_dev *hpdev, *tmp_hpdev;
 	struct completion *query_comp;
 	bool need_rescan = false;
@@ -938,7 +938,7 @@ hv_pci_devices_present(struct hv_pcibus *hbus,
 	dr->device_count = relations->device_count;
 	if (dr->device_count != 0)
 		memcpy(dr->func, relations->func,
-		    sizeof(struct pci_func_desc) * dr->device_count);
+		    sizeof(struct pci_func_desc2) * dr->device_count);
 
 	mtx_lock(&hbus->device_list_lock);
 	TAILQ_INSERT_TAIL(&hbus->dr_list, dr, link);
@@ -950,6 +950,35 @@ hv_pci_devices_present(struct hv_pcibus *hbus,
 	taskqueue_enqueue(hbus->sc->taskq, &dr_wrk->task);
 }
 
+static void
+hv_pci_devices_present2(struct hv_pcibus *hbus,
+    struct pci_bus_relations2 *relations)
+{
+	struct hv_dr_state *dr;
+	struct hv_dr_work *dr_wrk;
+	unsigned long dr_size;
+
+	if (hbus->detaching && relations->device_count > 0)
+		return;
+
+	dr_size = offsetof(struct hv_dr_state, func) +
+	    (sizeof(struct pci_func_desc2) * relations->device_count);
+	dr = malloc(dr_size, M_DEVBUF, M_WAITOK | M_ZERO);
+
+	dr->device_count = relations->device_count;
+	if (dr->device_count != 0)
+		memcpy(dr->func, relations->func,
+		    sizeof(struct pci_func_desc2) * dr->device_count);
+
+	mtx_lock(&hbus->device_list_lock);
+	TAILQ_INSERT_TAIL(&hbus->dr_list, dr, link);
+	mtx_unlock(&hbus->device_list_lock);
+
+	dr_wrk = malloc(sizeof(*dr_wrk), M_DEVBUF, M_WAITOK | M_ZERO);
+	dr_wrk->bus = hbus;
+	TASK_INIT(&dr_wrk->task, 0, pci_devices_present_work, dr_wrk);
+	taskqueue_enqueue(hbus->sc->taskq, &dr_wrk->task);
+}
 static void
 hv_eject_device_work(void *arg, int pending __unused)
 {
@@ -1006,6 +1035,7 @@ vmbus_pcib_on_channel_callback(struct vmbus_channel *chan, void *arg)
 	struct pci_response *response;
 	struct pci_incoming_message *new_msg;
 	struct pci_bus_relations *bus_rel;
+	struct pci_bus_relations2 *bus_rel2;
 	struct pci_dev_incoming *dev_msg;
 	struct hv_pci_dev *hpdev;
 
@@ -1068,18 +1098,18 @@ vmbus_pcib_on_channel_callback(struct vmbus_channel *chan, void *arg)
 				break;
 
 			case PCI_BUS_RELATIONS2:
-				bus_rel = (struct pci_bus_relations2 *)buffer;
+				bus_rel2 = (struct pci_bus_relations2 *)buffer;
 	
-				if (bus_rel->device_count == 0)
+				if (bus_rel2->device_count == 0)
 					break;
 				
 				if (bytes_rxed <
 				    offsetof(struct pci_bus_relations2, func) +
-				        (sizeof(struct pci_func_desc) *
-							(bus_rel->device_count)))
+				        (sizeof(struct pci_func_desc2) *
+							(bus_rel2->device_count)))
 					break;
 				
-				hv_pci_devices_present2(hbus, bus_rel);
+				hv_pci_devices_present2(hbus, bus_rel2);
 
 			case PCI_EJECT:
 				dev_msg = (struct pci_dev_incoming *)buffer;
