@@ -82,7 +82,7 @@ __FBSDID("$FreeBSD$");
 #include "msi_if.h"
 
 #define	INTRNAME_LEN	(2*MAXCOMLEN + 1)
-
+#define DEBUG
 #ifdef DEBUG
 #define debugf(fmt, args...) do { printf("%s(): ", __func__);	\
     printf(fmt,##args); } while (0)
@@ -1058,7 +1058,7 @@ intr_setup_irq(device_t dev, struct resource *res, driver_filter_t filt,
 
 	data = rman_get_virtual(res);
 	name = device_get_nameunit(dev);
-
+	debugf("data  type %d\n",data->type);
 #ifdef INTR_SOLO
 	/*
 	 * Standard handling is done through MI interrupt framework. However,

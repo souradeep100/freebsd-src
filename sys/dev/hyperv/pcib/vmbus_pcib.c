@@ -1853,14 +1853,16 @@ static int
 vmbus_pcib_alloc_msi(device_t pcib, device_t dev, int count,
     int maxcount, int *irqs)
 {
-	return (PCIB_ALLOC_MSI(device_get_parent(pcib), dev, count, maxcount,
-	    irqs));
+//	return (PCIB_ALLOC_MSI(device_get_parent(pcib), dev, count, maxcount,
+//	    irqs));
+	return (intr_alloc_msi(pcib, dev, ACPI_MSI_XREF, count, maxcount, irqs));
 }
 
 static int
 vmbus_pcib_release_msi(device_t pcib, device_t dev, int count, int *irqs)
 {
-	return (PCIB_RELEASE_MSI(device_get_parent(pcib), dev, count, irqs));
+	//return (PCIB_RELEASE_MSI(device_get_parent(pcib), dev, count, irqs));
+	return(intr_release_msi(pcib, dev, ACPI_MSI_XREF, count, irqs));
 }
 
 static int
@@ -1885,7 +1887,7 @@ static int
 vmbus_pcib_release_msix(device_t pcib, device_t dev, int irq)
 {
 	
-	return (PCIB_RELEASE_MSIX(device_get_parent(pcib), dev, irq));
+	return (intr_release_msix(pcib, dev, ACPI_MSI_XREF, irq));
 }
 
 #define	MSI_INTEL_ADDR_DEST	0x00000000
@@ -1916,6 +1918,7 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 
 	int ret;
 	device_printf(pcib,"vmbus_pcib_map_msi is called\n");
+	device_printf(child,"vmbus_pcib_map_msi is called for irq %d \n",irq);
 	devfn = PCI_DEVFN(pci_get_slot(child), pci_get_function(child));
 	hpdev = get_pcichild_wslot(sc->hbus, devfn_to_wslot(devfn));
 	if (!hpdev)
@@ -1936,7 +1939,7 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 		}
 	}
 
-	cpu = (v_addr ) >> 12;
+	cpu = 0;
 	vcpu_id = VMBUS_GET_VCPU_ID(device_get_parent(pcib), pcib, cpu);
 	vector = v_data;
 
@@ -1945,16 +1948,18 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 	memset(&ctxt, 0, sizeof(ctxt));
 	ctxt.pkt.completion_func = hv_pci_compose_compl;
 	ctxt.pkt.compl_ctxt = &comp;
-
+	device_printf(child,"vector is %d cpu is %d and vcpu_id %d\n",vector,cpu,vcpu_id);
 	int_pkt = (struct pci_create_interrupt3 *)&ctxt.pkt.message;
 	int_pkt->message_type.type = PCI_CREATE_INTERRUPT_MESSAGE3;
 	int_pkt->wslot.val = hpdev->desc.wslot.val;
+	device_printf(child,"type is %d and wslot.val is %d\n",int_pkt->message_type.type,int_pkt->wslot.val);
 	int_pkt->int_desc.vector = vector;
 	int_pkt->int_desc.vector_count = 1;
 	int_pkt->int_desc.reserved = 0;
 	int_pkt->int_desc.delivery_mode = MSI_INTEL_DATA_DELFIXED;
 	int_pkt->int_desc.processor_count = 1;
 	int_pkt->int_desc.processor_array[0] = vcpu_id;
+	device_printf(child,"int_pkt->int_desc.processor_array  %d\n",int_pkt->int_desc.processor_array[0]);
 	//int_pkt->int_desc.cpu_mask = 1ULL << vcpu_id;
 
 	ret = vmbus_chan_send(sc->chan,	VMBUS_CHANPKT_TYPE_INBAND,

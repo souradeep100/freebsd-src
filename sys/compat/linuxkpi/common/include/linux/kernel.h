@@ -204,6 +204,7 @@ scnprintf(char *buf, size_t size, const char *fmt, ...)
  * The "pr_debug()" and "pr_devel()" macros should produce zero code
  * unless DEBUG is defined:
  */
+#define DEBUG
 #ifdef DEBUG
 extern int linuxkpi_debug;
 #define pr_debug(fmt, ...)					\
