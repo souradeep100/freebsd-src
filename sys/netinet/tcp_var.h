@@ -181,7 +181,6 @@ struct tcpcb {
 	struct mbuf *t_in_pkt;
 	struct mbuf *t_tail_pkt;
 	struct tcp_timer *t_timers;	/* All the TCP timers in one struct */
-	struct	vnet *t_vnet;		/* back pointer to parent vnet */
 	uint32_t snd_ssthresh;		/* snd_cwnd size threshold for
 					 * for slow start exponential to
 					 * linear switch
@@ -213,8 +212,6 @@ struct tcpcb {
 	int	t_blackhole_enter;	/* when to enter blackhole detection */
 	int	t_blackhole_exit;	/* when to exit blackhole detection */
 	u_int	t_rttmin;		/* minimum rtt allowed */
-
-	u_int	t_rttbest;		/* best rtt we've seen */
 
 	int	t_softerror;		/* possible error not yet reported */
 	uint32_t max_sndwnd;		/* largest window peer has offered */
@@ -392,6 +389,11 @@ TAILQ_HEAD(tcp_funchead, tcp_function);
 struct tcpcb * tcp_drop(struct tcpcb *, int);
 
 #ifdef _NETINET_IN_PCB_H_
+#define	intotcpcb(inp)	((struct tcpcb *)(inp)->inp_ppcb)
+#define	sototcpcb(so)	intotcpcb(sotoinpcb(so))
+#define	tptoinpcb(tp)	tp->t_inpcb
+#define	tptosocket(tp)	tp->t_inpcb->inp_socket
+
 /*
  * tcp_output()
  * Handles tcp_drop request from advanced stacks and reports that inpcb is
@@ -401,9 +403,10 @@ struct tcpcb * tcp_drop(struct tcpcb *, int);
 static inline int
 tcp_output(struct tcpcb *tp)
 {
+	struct inpcb *inp = tptoinpcb(tp);
 	int rv;
 
-	INP_WLOCK_ASSERT(tp->t_inpcb);
+	INP_WLOCK_ASSERT(inp);
 
 	rv = tp->t_fb->tfb_tcp_output(tp);
 	if (rv < 0) {
@@ -412,7 +415,7 @@ tcp_output(struct tcpcb *tp)
 		    tp->t_fb->tfb_tcp_block_name, tp));
 		tp = tcp_drop(tp, -rv);
 		if (tp)
-			INP_WUNLOCK(tp->t_inpcb);
+			INP_WUNLOCK(inp);
 	}
 
 	return (rv);
@@ -426,9 +429,10 @@ tcp_output(struct tcpcb *tp)
 static inline int
 tcp_output_unlock(struct tcpcb *tp)
 {
+	struct inpcb *inp = tptoinpcb(tp);
 	int rv;
 
-	INP_WLOCK_ASSERT(tp->t_inpcb);
+	INP_WLOCK_ASSERT(inp);
 
 	rv = tp->t_fb->tfb_tcp_output(tp);
 	if (rv < 0) {
@@ -438,9 +442,9 @@ tcp_output_unlock(struct tcpcb *tp)
 		rv = -rv;
 		tp = tcp_drop(tp, rv);
 		if (tp)
-			INP_WUNLOCK(tp->t_inpcb);
+			INP_WUNLOCK(inp);
 	} else
-		INP_WUNLOCK(tp->t_inpcb);
+		INP_WUNLOCK(inp);
 
 	return (rv);
 }
@@ -460,7 +464,7 @@ tcp_output_nodrop(struct tcpcb *tp)
 {
 	int rv;
 
-	INP_WLOCK_ASSERT(tp->t_inpcb);
+	INP_WLOCK_ASSERT(tptoinpcb(tp));
 
 	rv = tp->t_fb->tfb_tcp_output(tp);
 	KASSERT(rv >= 0 || tp->t_fb->tfb_flags & TCP_FUNC_OUTPUT_CANDROP,
@@ -477,19 +481,27 @@ tcp_output_nodrop(struct tcpcb *tp)
 static inline int
 tcp_unlock_or_drop(struct tcpcb *tp, int tcp_output_retval)
 {
+	struct inpcb *inp = tptoinpcb(tp);
 
-	INP_WLOCK_ASSERT(tp->t_inpcb);
+	INP_WLOCK_ASSERT(inp);
 
         if (tcp_output_retval < 0) {
                 tcp_output_retval = -tcp_output_retval;
                 if (tcp_drop(tp, tcp_output_retval) != NULL)
-                        INP_WUNLOCK(tp->t_inpcb);
+                        INP_WUNLOCK(inp);
         } else
-		INP_WUNLOCK(tp->t_inpcb);
+		INP_WUNLOCK(inp);
 
 	return (tcp_output_retval);
 }
 #endif	/* _NETINET_IN_PCB_H_ */
+
+static int inline
+tcp_packets_this_ack(struct tcpcb *tp, tcp_seq ack)
+{
+	return ((ack - tp->snd_una) / tp->t_maxseg +
+		((((ack - tp->snd_una) % tp->t_maxseg) != 0) ? 1 : 0));
+}
 #endif	/* _KERNEL */
 
 /*
@@ -570,7 +582,9 @@ tcp_unlock_or_drop(struct tcpcb *tp, int tcp_output_retval)
 #define	TF2_ECN_SND_CWR		0x00000040 /* ECN CWR in queue */
 #define	TF2_ECN_SND_ECE		0x00000080 /* ECN ECE in queue */
 #define	TF2_ACE_PERMIT		0x00000100 /* Accurate ECN mode */
-#define TF2_FBYTES_COMPLETE	0x00000400 /* We have first bytes in and out */
+#define	TF2_FBYTES_COMPLETE	0x00000400 /* We have first bytes in and out */
+#define	TF2_ECN_USE_ECT1	0x00000800 /* Use ECT(1) marking on session */
+
 /*
  * Structure to hold TCP options that are only used during segment
  * processing (in tcp_input), but not held in the tcpcb.
@@ -630,9 +644,6 @@ struct tcp_ifcap {
 #ifndef _NETINET_IN_PCB_H_
 struct in_conninfo;
 #endif /* _NETINET_IN_PCB_H_ */
-
-#define	intotcpcb(ip)	((struct tcpcb *)(ip)->inp_ppcb)
-#define	sototcpcb(so)	(intotcpcb(sotoinpcb(so)))
 
 /*
  * The smoothed round-trip time and estimated variance
@@ -774,9 +785,9 @@ struct	tcpstat {
 	uint64_t tcps_sack_sboverflow;	    /* times scoreboard overflowed */
 
 	/* ECN related stats */
-	uint64_t tcps_ecn_ce;		/* ECN Congestion Experienced */
-	uint64_t tcps_ecn_ect0;		/* ECN Capable Transport */
-	uint64_t tcps_ecn_ect1;		/* ECN Capable Transport */
+	uint64_t tcps_ecn_rcvce;		/* ECN Congestion Experienced */
+	uint64_t tcps_ecn_rcvect0;		/* ECN Capable Transport */
+	uint64_t tcps_ecn_rcvect1;		/* ECN Capable Transport */
 	uint64_t tcps_ecn_shs;		/* ECN successful handshakes */
 	uint64_t tcps_ecn_rcwnd;	/* # times ECN reduced the cwnd */
 
@@ -811,7 +822,11 @@ struct	tcpstat {
 	uint64_t tcps_ace_ect0;		/* ACE SYN packet with ECT0 */
 	uint64_t tcps_ace_ce;		/* ACE SYN packet with CE */
 
-	uint64_t _pad[6];		/* 6 TBD placeholder for STABLE */
+	/* ECN related stats */
+	uint64_t tcps_ecn_sndect0;		/* ECN Capable Transport */
+	uint64_t tcps_ecn_sndect1;		/* ECN Capable Transport */
+
+	uint64_t _pad[4];		/* 4 TBD placeholder for STABLE */
 };
 
 #define	tcps_rcvmemdrop	tcps_rcvreassfull	/* compat */

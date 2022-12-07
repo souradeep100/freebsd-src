@@ -46,7 +46,7 @@ SRCS+=	linux_dummy_x86.c
 VDSODEPS=linux_vdso_gettc_x86.inc
 .endif
 .if ${MACHINE_CPUARCH} == "amd64"
-SRCS+=	linux${SFX}_support.s
+SRCS+=	linux${SFX}_support.S
 SRCS+=	linux_elf32.c
 .else
 SRCS+=	linux_copyout.c
@@ -132,9 +132,9 @@ linux${SFX}_vdso.so: linux${SFX}_vdso.so.o
 	${STRIPBIN} -N _binary_linux${SFX}_vdso_so_o_size ${.TARGET}
 
 .if ${MACHINE_CPUARCH} == "amd64"
-linux${SFX}_support.o: linux${SFX}_assym.h assym.inc
+linux${SFX}_support.o: linux${SFX}_support.S linux${SFX}_assym.h assym.inc
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
-	    ${.IMPSRC} -o ${.TARGET}
+	    ${.ALLSRC:M*.S:u} -o ${.TARGET}
 .endif
 
 linux${SFX}_genassym.o: offset.inc

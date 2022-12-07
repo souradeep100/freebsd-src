@@ -774,6 +774,8 @@ print_eth_rule(struct pfctl_eth_rule *r, const char *anchor_call,
 		else
 			printf(" on %s", r->ifname);
 	}
+	if (r->bridge_to[0])
+		printf(" bridge-to %s", r->bridge_to);
 	if (r->proto)
 		printf(" proto 0x%04x", r->proto);
 
@@ -1129,7 +1131,8 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 		if (r->rule_flag & PFRULE_REASSEMBLE_TCP)
 			printf(" reassemble tcp");
 
-		printf(" fragment reassemble");
+		printf(" fragment %sreassemble",
+		    r->rule_flag & PFRULE_FRAGMENT_NOREASS ? "no " : "");
 	}
 	i = 0;
 	while (r->label[i][0])

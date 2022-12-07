@@ -29,6 +29,7 @@
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/ck.h>
+#include <sys/epoch.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -38,7 +39,6 @@ __FBSDID("$FreeBSD$");
 
 #include <netlink/netlink.h>
 #include <netlink/netlink_ctl.h>
-#include <netlink/netlink_var.h>
 #include <netlink/netlink_generic.h>
 
 #define	DEBUG_MOD_NAME	nl_generic
@@ -47,7 +47,7 @@ __FBSDID("$FreeBSD$");
 _DECLARE_DEBUG(LOG_DEBUG3);
 
 #define	MAX_FAMILIES	20
-#define	MAX_GROUPS	20
+#define	MAX_GROUPS	64
 
 #define	MIN_GROUP_NUM	48
 
@@ -134,6 +134,22 @@ free_family(struct genl_family *gf)
 }
 
 /*
+ * unregister groups of a given family
+ */
+static void
+unregister_groups(const struct genl_family *gf)
+{
+
+	for (int i = 0; i < MAX_GROUPS; i++) {
+		struct genl_group *gg = &groups[i];
+		if (gg->group_family == gf && gg->group_name != NULL) {
+			gg->group_family = NULL;
+			gg->group_name = NULL;
+		}
+	}
+}
+
+/*
  * Can sleep, I guess
  */
 bool
@@ -148,6 +164,7 @@ genl_unregister_family(const char *family_name)
 
 	if (gf != NULL) {
 		found = true;
+		unregister_groups(gf);
 		/* TODO: zero pointer first */
 		free_family(gf);
 		bzero(gf, sizeof(*gf));

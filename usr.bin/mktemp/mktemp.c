@@ -85,6 +85,12 @@ main(int argc, char **argv)
 			tmpdir = optarg;
 			if (tmpdir == NULL || *tmpdir == '\0')
 				tmpdir = getenv("TMPDIR");
+
+			/*
+			 * We've already done the necessary environment
+			 * fallback, skip the later one.
+			 */
+			prefer_tmpdir = false;
 			break;
 
 		case 'q':
@@ -120,6 +126,7 @@ main(int argc, char **argv)
 
 	if (tflag) {
 		const char *envtmp;
+		size_t len;
 
 		envtmp = NULL;
 
@@ -131,7 +138,10 @@ main(int argc, char **argv)
 		if (envtmp != NULL)
 			tmpdir = envtmp;
 		if (tmpdir == NULL)
-			asprintf(&name, "%s%s.XXXXXXXXXX", _PATH_TMP, prefix);
+			tmpdir = _PATH_TMP;
+		len = strlen(tmpdir);
+		if (len > 0 && tmpdir[len - 1] == '/')
+			asprintf(&name, "%s%s.XXXXXXXXXX", tmpdir, prefix);
 		else
 			asprintf(&name, "%s/%s.XXXXXXXXXX", tmpdir, prefix);
 		/* if this fails, the program is in big trouble already */
@@ -142,7 +152,7 @@ main(int argc, char **argv)
 				errx(1, "cannot generate template");
 		}
 	}
-		
+
 	/* generate all requested files */
 	while (name != NULL || argc > 0) {
 		if (name == NULL) {
