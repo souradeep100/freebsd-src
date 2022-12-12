@@ -306,6 +306,8 @@ gic_v3_acpi_count_regions(device_t dev)
 	return (sc->gic_redists.nregions > 0 ? 0 : ENXIO);
 }
 
+#define HV_MSI_SPI_START 64
+#define HV_MSI_SPI_LAST 920
 static int
 gic_v3_acpi_attach(device_t dev)
 {
@@ -320,8 +322,8 @@ gic_v3_acpi_attach(device_t dev)
 	if (err != 0)
 		goto count_error;
 
-	sc->gic_mbi_start = 64;
-	sc->gic_mbi_end = 920;
+	sc->gic_mbi_start = HV_MSI_SPI_START;
+	sc->gic_mbi_end = HV_MSI_SPI_LAST;
 
 	err = gic_v3_attach(dev);
 	if (err != 0)
@@ -333,10 +335,18 @@ gic_v3_acpi_attach(device_t dev)
 		err = ENXIO;
 		goto error;
 	}
-	err = intr_msi_register(dev, ACPI_MSI_XREF);
-	if (err) {
-		device_printf(dev, "could not register MSI\n");
+	/*
+	 * Registering for MSI with SPI rnage, as this is
+	 * required for Hyper-V GIC to work in ARM64.
+	 */
+	if (vm_guest == VM_GUEST_HV) {
+		err = intr_msi_register(dev, ACPI_MSI_XREF);
+		if (err) {
+			device_printf(dev, "could not register MSI\n");
+			goto error;
+		}
 	}
+
 	if (intr_pic_claim_root(dev, ACPI_INTR_XREF, arm_gic_v3_intr, sc,
 	    GIC_LAST_SGI - GIC_FIRST_SGI + 1) != 0) {
 		err = ENXIO;

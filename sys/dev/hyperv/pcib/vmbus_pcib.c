@@ -1822,7 +1822,6 @@ vmbus_pcib_read_config(device_t dev, u_int bus, u_int slot, u_int func,
 		return (~0);
 
 	_hv_pcifront_read_config(hpdev, reg, bytes, &data);
-	device_printf(dev,"pci read config data is %u\n",data);
 	return (data);
 }
 

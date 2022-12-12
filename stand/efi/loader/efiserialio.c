@@ -493,11 +493,11 @@ comc_setup(void)
 	if (EFI_ERROR(status))
 		return (false);
 
-	status = comc_port->sio->SetAttributes(comc_port->sio,
+	/*status = comc_port->sio->SetAttributes(comc_port->sio,
 	    comc_port->baudrate, 0, 0, comc_port->parity,
 	    comc_port->databits, comc_port->stopbits);
 	if (EFI_ERROR(status))
-		return (false);
+		return (false);*/
 
 	status = comc_port->sio->GetControl(comc_port->sio, &control);
 	if (EFI_ERROR(status))
