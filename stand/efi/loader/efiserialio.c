@@ -261,11 +261,11 @@ comc_probe(struct console *sc)
 		if (comc_port == NULL)
 			return;
 	}
-	comc_port->baudrate = COMSPEED;
+	comc_port->baudrate = 0; 
 	comc_port->ioaddr = 0;			/* default port */
-	comc_port->databits = 8;		/* 8,n,1 */
-	comc_port->parity = NoParity;		/* 8,n,1 */
-	comc_port->stopbits = OneStopBit;	/* 8,n,1 */
+	comc_port->databits = 0;		/* 8,n,1 */
+	comc_port->parity = DefaultParity;		/* 8,n,1 */
+	comc_port->stopbits = DefaultStopBits;	/* 8,n,1 */
 	comc_port->ignore_cd = 1;		/* ignore cd */
 	comc_port->rtsdtr_off = 0;		/* rts-dtr is on */
 	comc_port->sio = NULL;
@@ -494,8 +494,8 @@ comc_setup(void)
 		return (false);
 
 	status = comc_port->sio->SetAttributes(comc_port->sio,
-	    0, 0, 0, DefaultParity,
-	    0, DefaultStopBits);
+	    comc_port->baudrate, 0, 0, comc_port->parity,
+	    comc_port->databits, comc_port->stopbits);
 	if (EFI_ERROR(status))
 		return (false);
 
