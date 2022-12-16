@@ -40,10 +40,6 @@ static EFI_GUID serial = SERIAL_IO_PROTOCOL;
 
 #define	COMC_TXWAIT	0x40000		/* transmit timeout */
 
-#ifndef	COMSPEED
-#define	COMSPEED	9600
-#endif
-
 #define	PNP0501		0x501		/* 16550A-compatible COM port */
 
 struct serial {
@@ -261,11 +257,14 @@ comc_probe(struct console *sc)
 		if (comc_port == NULL)
 			return;
 	}
-	comc_port->baudrate = 0; 
-	comc_port->ioaddr = 0;			/* default port */
-	comc_port->databits = 0;		/* 8,n,1 */
-	comc_port->parity = DefaultParity;		/* 8,n,1 */
-	comc_port->stopbits = DefaultStopBits;	/* 8,n,1 */
+	/*
+	 * setting default values from firmware
+	 */
+	comc_port->baudrate = 0;
+	comc_port->ioaddr = 0;
+	comc_port->databits = 0;
+	comc_port->parity = DefaultParity;
+	comc_port->stopbits = DefaultStopBits;
 	comc_port->ignore_cd = 1;		/* ignore cd */
 	comc_port->rtsdtr_off = 0;		/* rts-dtr is on */
 	comc_port->sio = NULL;
