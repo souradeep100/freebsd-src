@@ -307,7 +307,7 @@ gic_v3_acpi_count_regions(device_t dev)
 }
 
 #define HV_MSI_SPI_START 64
-#define HV_MSI_SPI_LAST 920
+#define HV_MSI_SPI_LAST GIC_I_NUM_MAX
 static int
 gic_v3_acpi_attach(device_t dev)
 {
@@ -324,7 +324,6 @@ gic_v3_acpi_attach(device_t dev)
 
 	sc->gic_mbi_start = HV_MSI_SPI_START;
 	sc->gic_mbi_end = HV_MSI_SPI_LAST;
-
 	err = gic_v3_attach(dev);
 	if (err != 0)
 		goto error;

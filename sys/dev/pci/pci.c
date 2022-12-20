@@ -2992,7 +2992,7 @@ pci_disable_io_method(device_t dev, device_t child, int space)
 void
 pci_print_verbose(struct pci_devinfo *dinfo)
 {
-
+	printf("pci_print_verbose is called\n");
 	if (bootverbose) {
 		pcicfgregs *cfg = &dinfo->cfg;
 
