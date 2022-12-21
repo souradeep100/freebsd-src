@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 
 #define	GICV3_PRIV_VGIC		0x80000000
 #define	GICV3_PRIV_FLAGS	0x80000000
+#define HV_MSI_SPI_START 	64
+#define HV_MSI_SPI_LAST 	0
 
 struct gic_v3_acpi_devinfo {
 	struct gic_v3_devinfo	di_gic_dinfo;
@@ -306,8 +308,6 @@ gic_v3_acpi_count_regions(device_t dev)
 	return (sc->gic_redists.nregions > 0 ? 0 : ENXIO);
 }
 
-#define HV_MSI_SPI_START 64
-#define HV_MSI_SPI_LAST GIC_I_NUM_MAX
 static int
 gic_v3_acpi_attach(device_t dev)
 {
