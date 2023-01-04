@@ -51,7 +51,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/pmap.h>
 
+#if defined(__aarch64__)
 #include <arm64/include/intr.h>
+#endif
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/frame.h>
@@ -64,13 +66,16 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pci_private.h>
 #include <dev/pci/pcib_private.h>
 #include "pcib_if.h"
-//#include <machine/intr_machdep.h>
-//#include <x86/apicreg.h>
+#if defined(__i386__) || defined(__amd64__)
+#include <machine/intr_machdep.h>
+#include <x86/apicreg.h>
+#endif
+#if defined(__aarch64__)
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
-
 #include <dev/acpica/acpivar.h>
 #include <dev/acpica/acpi_pcibvar.h>
+#endif
 #include <dev/hyperv/include/hyperv.h>
 #include <dev/hyperv/include/hyperv_busdma.h>
 #include <dev/hyperv/include/vmbus_xact.h>
@@ -150,7 +155,8 @@ wait_for_completion_timeout(struct completion *c, int timeout)
 #define PCI_MAKE_VERSION(major, minor) ((uint32_t)(((major) << 16) | (minor)))
 
 enum {
-	PCI_PROTOCOL_VERSION_1_1 = PCI_MAKE_VERSION(1, 4),
+	PCI_PROTOCOL_VERSION_1_1 = PCI_MAKE_VERSION(1, 1),
+	PCI_PROTOCOL_VERSION_1_4 = PCI_MAKE_VERSION(1, 4),
 	PCI_PROTOCOL_VERSION_CURRENT = PCI_PROTOCOL_VERSION_1_1
 };
 
@@ -187,12 +193,12 @@ enum pci_message_type {
 	PCI_QUERY_PROTOCOL_VERSION      = PCI_MESSAGE_BASE + 0x13,
 	PCI_CREATE_INTERRUPT_MESSAGE    = PCI_MESSAGE_BASE + 0x14,
 	PCI_DELETE_INTERRUPT_MESSAGE    = PCI_MESSAGE_BASE + 0x15,
-	PCI_RESOURCES_ASSIGNED2     = PCI_MESSAGE_BASE + 0x16,
-    PCI_CREATE_INTERRUPT_MESSAGE2   = PCI_MESSAGE_BASE + 0x17,
-    PCI_DELETE_INTERRUPT_MESSAGE2   = PCI_MESSAGE_BASE + 0x18, /* unused */
-    PCI_BUS_RELATIONS2      = PCI_MESSAGE_BASE + 0x19,
-    PCI_RESOURCES_ASSIGNED3         = PCI_MESSAGE_BASE + 0x1A,
-	PCI_CREATE_INTERRUPT_MESSAGE3   = PCI_MESSAGE_BASE + 0x1B,
+	PCI_RESOURCES_ASSIGNED2			= PCI_MESSAGE_BASE + 0x16,
+	PCI_CREATE_INTERRUPT_MESSAGE2	= PCI_MESSAGE_BASE + 0x17,
+	PCI_DELETE_INTERRUPT_MESSAGE2	= PCI_MESSAGE_BASE + 0x18,
+	PCI_BUS_RELATIONS2				= PCI_MESSAGE_BASE + 0x19,
+	PCI_RESOURCES_ASSIGNED3			= PCI_MESSAGE_BASE + 0x1A,
+	PCI_CREATE_INTERRUPT_MESSAGE3	= PCI_MESSAGE_BASE + 0x1B,
 	PCI_MESSAGE_MAXIMUM
 };
 
@@ -419,10 +425,25 @@ struct hv_pcibus {
 	volatile int detaching;
 };
 
+struct hv_pcidev_desc {
+	uint16_t	v_id;	/* vendor ID */
+	uint16_t	d_id;	/* device ID */
+	uint8_t		rev;
+	uint8_t		prog_intf;
+	uint8_t		subclass;
+	uint8_t		base_class;
+	uint32_t	subsystem_id;
+	union win_slot_encoding wslot;
+	uint32_t	ser;	/* serial number */
+	uint32_t flags;
+    uint16_t virtual_numa_node;
+} __packed;
+
+
 struct hv_pci_dev {
 	TAILQ_ENTRY(hv_pci_dev) link;
 
-	struct pci_func_desc2 desc;
+	struct hv_pcidev_desc desc;
 
 	bool reported_missing;
 
@@ -450,7 +471,7 @@ struct hv_dr_work {
 struct hv_dr_state {
 	TAILQ_ENTRY(hv_dr_state) link;
 	uint32_t device_count;
-	struct pci_func_desc2 func[0];
+	struct hv_pcidev_desc func[0];
 };
 
 struct hv_irq_desc {
@@ -581,8 +602,6 @@ hv_pci_compose_compl(void *context, struct pci_response *resp,
 	struct pci_create_int_response *int_resp =
 	    (struct pci_create_int_response *)resp;
 
-	printf("vmbus_pcib:hv_pci_compose_compl is called\n");
-		
 	comp_pkt->comp_pkt.completion_status = resp->status;
 	comp_pkt->int_desc = int_resp->int_desc;
 	complete(&comp_pkt->comp_pkt.host_event);
@@ -637,9 +656,9 @@ hv_pci_delete_device(struct hv_pci_dev *hpdev)
 
 	free(hpdev, M_DEVBUF);
 }
-
+/* todo needs to change this function to take care of pci proto 1.3 */
 static struct hv_pci_dev *
-new_pcichild_device(struct hv_pcibus *hbus, struct pci_func_desc2 *desc)
+new_pcichild_device(struct hv_pcibus *hbus, struct hv_pcidev_desc *desc)
 {
 	struct hv_pci_dev *hpdev;
 	struct pci_child_message *res_req;
@@ -823,7 +842,7 @@ pci_devices_present_work(void *arg, int pending __unused)
 	struct hv_pcibus *hbus;
 	uint32_t child_no;
 	bool found;
-	struct pci_func_desc2 *new_desc;
+	struct hv_pcidev_desc *new_desc;
 	struct hv_pci_dev *hpdev, *tmp_hpdev;
 	struct completion *query_comp;
 	bool need_rescan = false;
@@ -938,7 +957,7 @@ hv_pci_devices_present(struct hv_pcibus *hbus,
 	dr->device_count = relations->device_count;
 	if (dr->device_count != 0)
 		memcpy(dr->func, relations->func,
-		    sizeof(struct pci_func_desc2) * dr->device_count);
+		    sizeof(struct hv_pcidev_desc) * dr->device_count);
 
 	mtx_lock(&hbus->device_list_lock);
 	TAILQ_INSERT_TAIL(&hbus->dr_list, dr, link);
@@ -979,6 +998,7 @@ hv_pci_devices_present2(struct hv_pcibus *hbus,
 	TASK_INIT(&dr_wrk->task, 0, pci_devices_present_work, dr_wrk);
 	taskqueue_enqueue(hbus->sc->taskq, &dr_wrk->task);
 }
+/* todo this function also needs to get changed for pci protocol 1.3 */
 static void
 hv_eject_device_work(void *arg, int pending __unused)
 {
@@ -1252,18 +1272,19 @@ out:
 static int
 hv_send_resources_allocated(struct hv_pcibus *hbus)
 {
-	//struct pci_resources_assigned *res_assigned;
+	struct pci_resources_assigned *res_assigned;
 	struct pci_resources_assigned2 *res_assigned2;
 	struct hv_pci_compl comp_pkt;
 	struct hv_pci_dev *hpdev;
 	struct pci_packet *pkt;
 	uint32_t wslot;
 	int ret = 0;
-	
-	/* later use hbus protocol version to malloc based on different res_assigned*/
-	pkt = malloc(sizeof(*pkt) + sizeof(*res_assigned2),
+	size_t size_res;
+
+	size_res = (hbus->protocol_version < PCI_PROTOCOL_VERSION_1_4)
+			? sizeof(*res_assigned) : sizeof(*res_assigned2);
+	pkt = malloc(sizeof(*pkt) + size_res,
 	    M_DEVBUF, M_WAITOK | M_ZERO);
-	
 
 	for (wslot = 0; wslot < 256; wslot++) {
 		hpdev = get_pcichild_wslot(hbus, wslot);
@@ -1272,17 +1293,23 @@ hv_send_resources_allocated(struct hv_pcibus *hbus)
 
 		init_completion(&comp_pkt.host_event);
 
-		memset(pkt, 0, sizeof(*pkt) + sizeof(*res_assigned2));
+		memset(pkt, 0, sizeof(*pkt) + size_res);
 		pkt->completion_func = hv_pci_generic_compl;
 		pkt->compl_ctxt = &comp_pkt;
 
-		res_assigned2 = (struct pci_resources_assigned2 *)&pkt->message;
-		res_assigned2->message_type.type = PCI_RESOURCES_ASSIGNED2;
-		res_assigned2->wslot.val = hpdev->desc.wslot.val;
+		if (hbus->protocol_version < PCI_PROTOCOL_VERSION_1_4) {
+			res_assigned = (struct pci_resources_assigned *)&pkt->message;
+			res_assigned->message_type.type = PCI_RESOURCES_ASSIGNED;
+			res_assigned->wslot.val = hpdev->desc.wslot.val;
+		} else {
+			res_assigned2 = (struct pci_resources_assigned2 *)&pkt->message;
+			res_assigned2->message_type.type = PCI_RESOURCES_ASSIGNED2;
+			res_assigned2->wslot.val = hpdev->desc.wslot.val;
+		}
 
 		ret = vmbus_chan_send(hbus->sc->chan,
 		    VMBUS_CHANPKT_TYPE_INBAND, VMBUS_CHANPKT_FLAG_RC,
-		    &pkt->message, sizeof(*res_assigned2),
+		    &pkt->message, size_res,
 		    (uint64_t)(uintptr_t)pkt);
 		if (!ret)
 			ret = wait_for_response(hbus, &comp_pkt.host_event);
@@ -1591,7 +1618,6 @@ vmbus_pcib_attach(device_t dev)
 	sc->rx_buf = malloc(PCIB_PACKET_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
 	sc->hbus = hbus;
 
-
 	/*
 	 * The taskq is used to handle PCI_BUS_RELATIONS and PCI_EJECT
 	 * messages. NB: we can't handle the messages in the channel callback
@@ -1822,6 +1848,7 @@ vmbus_pcib_read_config(device_t dev, u_int bus, u_int slot, u_int func,
 		return (~0);
 
 	_hv_pcifront_read_config(hpdev, reg, bytes, &data);
+
 	return (data);
 }
 
@@ -1838,6 +1865,7 @@ vmbus_pcib_write_config(device_t dev, u_int bus, u_int slot, u_int func,
 	hpdev = get_pcichild_wslot(sc->hbus, devfn_to_wslot(devfn));
 	if (!hpdev)
 		return;
+
 	_hv_pcifront_write_config(hpdev, reg, bytes, data);
 }
 
@@ -1852,46 +1880,61 @@ static int
 vmbus_pcib_alloc_msi(device_t pcib, device_t dev, int count,
     int maxcount, int *irqs)
 {
-//	return (PCIB_ALLOC_MSI(device_get_parent(pcib), dev, count, maxcount,
-//	    irqs));
+#if defined(__amd64) || defined(__i386__)
+	return (PCIB_ALLOC_MSI(device_get_parent(pcib), dev, count, maxcount,
+	    irqs));
+#endif
+#if defined(__aarch64__)
 	return (intr_alloc_msi(pcib, dev, ACPI_MSI_XREF, count, maxcount, irqs));
+#endif
 }
 
 static int
 vmbus_pcib_release_msi(device_t pcib, device_t dev, int count, int *irqs)
 {
-	//return (PCIB_RELEASE_MSI(device_get_parent(pcib), dev, count, irqs));
+#if defined(__amd64) || defined(__i386__)
+	return (PCIB_RELEASE_MSI(device_get_parent(pcib), dev, count, irqs));
+#endif
+#if defined(__aarch64__)
 	return(intr_release_msi(pcib, dev, ACPI_MSI_XREF, count, irqs));
+#endif
 }
 
 static int
 vmbus_pcib_alloc_msix(device_t pcib, device_t dev, int *irq)
 {
+#if defined(__aarch64__)
 	int ret;
-	device_printf(device_get_parent(pcib),"vmbus_pcib_alloc_msix called\n");
-	device_printf(pcib,"vmbus_pcib_alloc_msix called -1\n");
-	device_printf(dev,"vmbus_pcib_alloc_msix_called -2\n");
 #if defined(INTRNG)
-	device_printf(pcib,"vmbus_pcib_alloc_msix is called -3\n");
-
     ret = intr_alloc_msix(pcib, dev, ACPI_MSI_XREF, irq);
-	device_printf(pcib, "the return value of intr_alloc_msix is %d\n",ret);
 	return ret;
 #else
     return (ENXIO);
 #endif
+#else
+	return (PCIB_ALLOC_MSIX(device_get_parent(pcib), dev, irq));
+#endif /* __aarch64__ */
 }
 
 static int
 vmbus_pcib_release_msix(device_t pcib, device_t dev, int irq)
 {
-	
+#if defined(__aarch64__)
 	return (intr_release_msix(pcib, dev, ACPI_MSI_XREF, irq));
+#else
+	return (PCIB_RELEASE_MSIX(device_get_parent(pcib), dev, irq));
+#endif /* __aarch64__ */
 }
 
+#if defined(__aarch64__)
 #define	MSI_INTEL_ADDR_DEST	0x00000000
-#define	MSI_INTEL_DATA_INTVEC	IOART_INTVEC	/* Interrupt vector. */
 #define	MSI_INTEL_DATA_DELFIXED 0x0
+#endif
+#if defined(__amd64__) || defined(__i386__)
+#define MSI_INTEL_ADDR_DEST 0x000ff000
+#define MSI_INTEL_DATA_INTVEC   IOART_INTVEC    /* Interrupt vector. */
+#define MSI_INTEL_DATA_DELFIXED IOART_DELFIXED
+#endif
 
 static int
 vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
@@ -1903,30 +1946,35 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 	uint64_t v_addr;
 	uint32_t v_data;
 	struct hv_irq_desc *hid, *tmp_hid;
-	unsigned int cpu;
+	unsigned int cpu, vcpu_id;
 	unsigned int vector;
-	uint32_t vcpu_id;
 
 	struct vmbus_pcib_softc *sc = device_get_softc(pcib);
-	struct pci_create_interrupt3 *int_pkt;
 	struct compose_comp_ctxt comp;
 	struct {
 		struct pci_packet pkt;
-		uint8_t buffer[sizeof(struct pci_create_interrupt3)];
+		union {
+			struct pci_create_interrupt v1;
+			struct pci_create_interrupt3 v3;
+		}int_pkts;
 	} ctxt;
-
 	int ret;
-	device_printf(pcib,"vmbus_pcib_map_msi is called\n");
+	uint32_t size;
+
 	device_printf(child,"vmbus_pcib_map_msi is called for irq %d \n",irq);
 	devfn = PCI_DEVFN(pci_get_slot(child), pci_get_function(child));
 	hpdev = get_pcichild_wslot(sc->hbus, devfn_to_wslot(devfn));
 	if (!hpdev)
 		return (ENOENT);
-
+#if defined(__aarch64__)
 	ret = intr_map_msi(pcib, child, ACPI_MSI_XREF, irq,
 	    &v_addr, &v_data);
 
 	device_printf(pcib,"vmbus_pcib_map_msi PCIB_MAP_MSI returned %d data 0x%x addr 0x%lx\n",ret,v_data,v_addr);
+#else
+	ret = PCIB_MAP_MSI(device_get_parent(pcib), child, irq,
+        &v_addr, &v_data);
+#endif
 	if (ret)
 		return (ret);
 
@@ -1938,33 +1986,47 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 		}
 	}
 
+#if defined(__aarch64__)
 	cpu = 0;
 	vcpu_id = VMBUS_GET_VCPU_ID(device_get_parent(pcib), pcib, cpu);
 	vector = v_data;
+#else
+	cpu = (v_addr & MSI_INTEL_ADDR_DEST) >> 12;
+	vcpu_id = VMBUS_GET_VCPU_ID(device_get_parent(pcib), pcib, cpu);
+	vector = v_data & MSI_INTEL_DATA_INTVEC;
+#endif
 
 	init_completion(&comp.comp_pkt.host_event);
 
 	memset(&ctxt, 0, sizeof(ctxt));
 	ctxt.pkt.completion_func = hv_pci_compose_compl;
 	ctxt.pkt.compl_ctxt = &comp;
-	device_printf(child,"vector is %d cpu is %d and vcpu_id %d\n",vector,cpu,vcpu_id);
-	int_pkt = (struct pci_create_interrupt3 *)&ctxt.pkt.message;
-	int_pkt->message_type.type = PCI_CREATE_INTERRUPT_MESSAGE3;
-	int_pkt->wslot.val = hpdev->desc.wslot.val;
-	device_printf(child,"type is %d and wslot.val is %d\n",int_pkt->message_type.type,int_pkt->wslot.val);
-	int_pkt->int_desc.vector = vector;
-	int_pkt->int_desc.vector_count = 1;
-	int_pkt->int_desc.reserved = 0;
-	int_pkt->int_desc.delivery_mode = MSI_INTEL_DATA_DELFIXED;
-	int_pkt->int_desc.processor_count = 1;
-	int_pkt->int_desc.processor_array[0] = vcpu_id;
-	device_printf(child,"int_pkt->int_desc.processor_array  %d\n",int_pkt->int_desc.processor_array[0]);
-	//int_pkt->int_desc.cpu_mask = 1ULL << vcpu_id;
+	switch (hpdev->hbus->protocol_version) {
+	case PCI_PROTOCOL_VERSION_1_1:
+		ctxt.int_pkts.v1.message_type.type = PCI_CREATE_INTERRUPT_MESSAGE;
+		ctxt.int_pkts.v1.wslot.val = hpdev->desc.wslot.val;
+		ctxt.int_pkts.v1.int_desc.vector = vector;
+		ctxt.int_pkts.v1.int_desc.vector_count = 1;
+		ctxt.int_pkts.v1.int_desc.delivery_mode = MSI_INTEL_DATA_DELFIXED;
+		ctxt.int_pkts.v1.int_desc.cpu_mask = 1ULL << vcpu_id;
+		size = sizeof(ctxt.int_pkts.v1);
+		break;
 
+	case PCI_PROTOCOL_VERSION_1_4:
+		ctxt.int_pkts.v3.message_type.type = PCI_CREATE_INTERRUPT_MESSAGE3;
+		ctxt.int_pkts.v3.wslot.val = hpdev->desc.wslot.val;
+		ctxt.int_pkts.v3.int_desc.vector = vector;
+		ctxt.int_pkts.v3.int_desc.vector_count = 1;
+		ctxt.int_pkts.v3.int_desc.reserved = 0;
+		ctxt.int_pkts.v3.int_desc.delivery_mode = MSI_INTEL_DATA_DELFIXED;
+		ctxt.int_pkts.v3.int_desc.processor_count = 1;
+		ctxt.int_pkts.v3.int_desc.processor_array[0] = vcpu_id;
+		size = sizeof(ctxt.int_pkts.v3);
+		break;
+	}
 	ret = vmbus_chan_send(sc->chan,	VMBUS_CHANPKT_TYPE_INBAND,
-	    VMBUS_CHANPKT_FLAG_RC, int_pkt, sizeof(*int_pkt),
+	    VMBUS_CHANPKT_FLAG_RC, &ctxt.int_pkts, size,
 	    (uint64_t)(uintptr_t)&ctxt.pkt);
-	device_printf(pcib,"vmbus_pcib_map_msi vmbus_chan_send returned %d\n",ret);
 	if (ret) {
 		free_completion(&comp.comp_pkt.host_event);
 		return (ret);
@@ -1985,7 +2047,7 @@ vmbus_pcib_map_msi(device_t pcib, device_t child, int irq,
 	hid->irq = irq;
 	hid->desc = comp.int_desc;
 	TAILQ_INSERT_TAIL(&hpdev->irq_desc_list, hid, link);
-	device_printf(pcib,"vmbus_pcib_map_msi returning \n");
+
 	return (0);
 }
 

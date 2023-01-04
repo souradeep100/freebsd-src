@@ -321,9 +321,10 @@ gic_v3_acpi_attach(device_t dev)
 	err = gic_v3_acpi_count_regions(dev);
 	if (err != 0)
 		goto count_error;
-
-	sc->gic_mbi_start = HV_MSI_SPI_START;
-	sc->gic_mbi_end = HV_MSI_SPI_LAST;
+	if (vm_guest == VM_GUEST_HV) {
+		sc->gic_mbi_start = HV_MSI_SPI_START;
+		sc->gic_mbi_end = HV_MSI_SPI_LAST;
+	}
 	err = gic_v3_attach(dev);
 	if (err != 0)
 		goto error;

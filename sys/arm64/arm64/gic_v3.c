@@ -390,7 +390,7 @@ gic_v3_attach(device_t dev)
 			sc->gic_mbi_end = sc->gic_nirqs - 1;
 		}
 		gic_v3_reserve_msi_range(dev, sc->gic_mbi_start,
-			sc->gic_mbi_end - sc->gic_mbi_start);
+		    sc->gic_mbi_end - sc->gic_mbi_start);
 
 		if (bootverbose) {
 			device_printf(dev, "using spi %u to %u\n", sc->gic_mbi_start,
