@@ -159,10 +159,10 @@ wait_for_completion_timeout(struct completion *c, int timeout)
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define PCI_MAKE_VERSION(major, minor) ((uint32_t)(((major) << 16) | (minor)))
 
-enum {
+enum pci_protocol_version_t {
 	PCI_PROTOCOL_VERSION_1_1 = PCI_MAKE_VERSION(1, 1),
 	PCI_PROTOCOL_VERSION_1_4 = PCI_MAKE_VERSION(1, 4),
-} pci_protocol_version_t;
+};
 
 static enum pci_protocol_version_t pci_protocol_versions[] = {
 	PCI_PROTOCOL_VERSION_1_4,
