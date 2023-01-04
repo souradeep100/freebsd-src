@@ -101,7 +101,11 @@ init_completion(struct completion *c)
 	mtx_init(&c->lock, "hvcmpl", NULL, MTX_DEF);
 	c->done = 0;
 }
-
+static void
+reinit_completion(struct completion *c)
+{
+	c->done = 0;
+}
 static void
 free_completion(struct completion *c)
 {
@@ -152,12 +156,17 @@ wait_for_completion_timeout(struct completion *c, int timeout)
 	return (ret);
 }
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define PCI_MAKE_VERSION(major, minor) ((uint32_t)(((major) << 16) | (minor)))
 
 enum {
 	PCI_PROTOCOL_VERSION_1_1 = PCI_MAKE_VERSION(1, 1),
 	PCI_PROTOCOL_VERSION_1_4 = PCI_MAKE_VERSION(1, 4),
-	PCI_PROTOCOL_VERSION_CURRENT = PCI_PROTOCOL_VERSION_1_1
+} pci_protocol_version_t;
+
+static enum pci_protocol_version_t pci_protocol_versions[] = {
+	PCI_PROTOCOL_VERSION_1_4,
+	PCI_PROTOCOL_VERSION_1_1,
 };
 
 #define PCI_CONFIG_MMIO_LENGTH	0x2000
@@ -201,6 +210,8 @@ enum pci_message_type {
 	PCI_CREATE_INTERRUPT_MESSAGE3	= PCI_MESSAGE_BASE + 0x1B,
 	PCI_MESSAGE_MAXIMUM
 };
+
+#define STATUS_REVISION_MISMATCH 0xC0000059
 
 /*
  * Structures defining the virtual PCI Express protocol.
@@ -314,7 +325,6 @@ struct pci_packet {
 struct pci_version_request {
 	struct pci_message message_type;
 	uint32_t protocol_version;
-	uint32_t is_last_attempt:1;
 	uint32_t reservedz:31;
 } __packed;
 
@@ -1158,7 +1168,9 @@ vmbus_pcib_on_channel_callback(struct vmbus_channel *chan, void *arg)
 }
 
 static int
-hv_pci_protocol_negotiation(struct hv_pcibus *hbus)
+hv_pci_protocol_negotiation(struct hv_pcibus *hbus,
+							enum pci_protocol_version_t version[],
+							int num_version)
 {
 	struct pci_version_request *version_req;
 	struct hv_pci_compl comp_pkt;
@@ -1167,6 +1179,7 @@ hv_pci_protocol_negotiation(struct hv_pcibus *hbus)
 		uint8_t buffer[sizeof(struct pci_version_request)];
 	} ctxt;
 	int ret;
+	int i;
 
 	init_completion(&comp_pkt.host_event);
 
@@ -1174,31 +1187,43 @@ hv_pci_protocol_negotiation(struct hv_pcibus *hbus)
 	ctxt.pkt.compl_ctxt = &comp_pkt;
 	version_req = (struct pci_version_request *)&ctxt.pkt.message;
 	version_req->message_type.type = PCI_QUERY_PROTOCOL_VERSION;
-	version_req->protocol_version = PCI_PROTOCOL_VERSION_CURRENT;
-	version_req->is_last_attempt = 1;
 
-	ret = vmbus_chan_send(hbus->sc->chan, VMBUS_CHANPKT_TYPE_INBAND,
-	    VMBUS_CHANPKT_FLAG_RC, version_req, sizeof(*version_req),
-	    (uint64_t)(uintptr_t)&ctxt.pkt);
-	if (!ret)
-		ret = wait_for_response(hbus, &comp_pkt.host_event);
+	for(i=0; i< num_version; i++) { 
+		version_req->protocol_version = version[i];
+		ret = vmbus_chan_send(hbus->sc->chan, VMBUS_CHANPKT_TYPE_INBAND,
+			VMBUS_CHANPKT_FLAG_RC, version_req, sizeof(*version_req),
+			(uint64_t)(uintptr_t)&ctxt.pkt);
+		if (!ret)
+			ret = wait_for_response(hbus, &comp_pkt.host_event);
 
-	if (ret) {
-		device_printf(hbus->pcib,
-		    "vmbus_pcib failed to request version: %d\n",
-		    ret);
-		goto out;
+		if (ret) {
+			device_printf(hbus->pcib,
+				"vmbus_pcib failed to request version: %d\n",
+				ret);
+			goto out;
+		}
+
+		if (comp_pkt.completion_status >= 0) {
+			hbus->protocol_version = version[i];
+			device_printf(hbus->pcib,
+				"PCI VMBus using version 0x%x\n",
+				hbus->protocol_version);
+			ret = 0;
+			goto out;
+		}
+
+		if (comp_pkt.completion_status != STATUS_REVISION_MISMATCH) {
+			device_printf(hbus->pcib,
+				"vmbus_pcib version negotiation failed: %x\n",
+				comp_pkt.completion_status);
+			ret = EPROTO;
+			goto out;
+		}
+		reinit_completion(&comp_pkt.host_event);
 	}
 
-	if (comp_pkt.completion_status < 0) {
-		device_printf(hbus->pcib,
-		    "vmbus_pcib version negotiation failed: %x\n",
-		    comp_pkt.completion_status);
-		ret = EPROTO;
-	} else {
-		ret = 0;
-		hbus->protocol_version = PCI_PROTOCOL_VERSION_CURRENT;
-	}
+	device_printf(hbus->pcib,
+		"PCI pass-trhpugh VSP failed to find supported version\n");
 out:
 	free_completion(&comp_pkt.host_event);
 	return (ret);
@@ -1639,7 +1664,8 @@ vmbus_pcib_attach(device_t dev)
 	if (ret)
 		goto free_res;
 
-	ret = hv_pci_protocol_negotiation(hbus);
+	ret = hv_pci_protocol_negotiation(hbus, pci_protocol_versions,
+					ARRAY_SIZE(pci_protocol_versions));
 	if (ret)
 		goto vmbus_close;
 
@@ -1880,7 +1906,7 @@ static int
 vmbus_pcib_alloc_msi(device_t pcib, device_t dev, int count,
     int maxcount, int *irqs)
 {
-#if defined(__amd64) || defined(__i386__)
+#if defined(__amd64__) || defined(__i386__)
 	return (PCIB_ALLOC_MSI(device_get_parent(pcib), dev, count, maxcount,
 	    irqs));
 #endif
@@ -1892,7 +1918,7 @@ vmbus_pcib_alloc_msi(device_t pcib, device_t dev, int count,
 static int
 vmbus_pcib_release_msi(device_t pcib, device_t dev, int count, int *irqs)
 {
-#if defined(__amd64) || defined(__i386__)
+#if defined(__amd64__) || defined(__i386__)
 	return (PCIB_RELEASE_MSI(device_get_parent(pcib), dev, count, irqs));
 #endif
 #if defined(__aarch64__)
