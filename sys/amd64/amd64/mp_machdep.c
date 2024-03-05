@@ -617,6 +617,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 		goto local_cb;
 
 	KASSERT(curthread->td_pinned > 0, ("curthread not pinned"));
+	printf("smp_targeted_tlb_shootdown is called\n");
 
 	/*
 	 * Make a stable copy of the set of CPUs on which the pmap is active.
@@ -985,6 +986,7 @@ static void
 invlop_handler_one_req(enum invl_op_codes smp_tlb_op, pmap_t smp_tlb_pmap,
     vm_offset_t smp_tlb_addr1, vm_offset_t smp_tlb_addr2)
 {
+	printf("invlop_handler_one_req is called for smp_tlb_op %d\n", smp_tlb_op);
 	switch (smp_tlb_op) {
 	case INVL_OP_TLB:
 		invltlb_handler(smp_tlb_pmap);
@@ -1036,7 +1038,7 @@ invlop_handler(void)
 	u_int initiator_cpu_id;
 	enum invl_op_codes smp_tlb_op;
 	uint32_t *scoreboard, smp_tlb_gen;
-
+	printf("invlop_handler is called\n");
 	scoreboard = invl_scoreboard_getcpu(PCPU_GET(cpuid));
 	for (;;) {
 		for (initiator_cpu_id = 0; initiator_cpu_id <= mp_maxid;
@@ -1059,6 +1061,7 @@ invlop_handler(void)
 		smp_tlb_addr1 = initiator_pc->pc_smp_tlb_addr1;
 		smp_tlb_addr2 = initiator_pc->pc_smp_tlb_addr2;
 		smp_tlb_op = initiator_pc->pc_smp_tlb_op;
+		printf("the smp_tlb_op is %d\n", smp_tlb_op);
 		smp_tlb_gen = initiator_pc->pc_smp_tlb_gen;
 
 		/*
@@ -1078,7 +1081,7 @@ invlop_handler(void)
 		 */
 		atomic_thread_fence_acq();
 		atomic_store_int(&scoreboard[initiator_cpu_id], smp_tlb_gen);
-
+		printf("invlop_handler  calling invlop_handler_one_req for smp_tlb_op %d\n", smp_tlb_op);
 		invlop_handler_one_req(smp_tlb_op, smp_tlb_pmap, smp_tlb_addr1,
 		    smp_tlb_addr2);
 	}
