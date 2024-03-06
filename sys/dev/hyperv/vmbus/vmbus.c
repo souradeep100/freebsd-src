@@ -44,10 +44,6 @@
 #include <sys/systm.h>
 #include <sys/taskqueue.h>
 
-#include <vm/vm.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
 
 #include <machine/bus.h>
 #if defined(__aarch64__)
@@ -78,6 +74,7 @@
 #include "vmbus_if.h"
 
 #define VMBUS_GPADL_START		0xe1e10
+#define BIT(n)                  (1ULL << (n))
 
 struct vmbus_msghc {
 	struct vmbus_xact		*mh_xact;
@@ -791,40 +788,41 @@ vmbus_synic_setup(void *xsc)
 #define HV_FLUSH_ALL_PROCESSORS BIT(0)
 #define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
 #define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
-
+#define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
 uint64_t
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
 {
-        struct hyperv_tlb_flush *flush;
+        struct hyperv_tlb_flush flush;
 	struct vmbus_softc *sc = vmbus_get_softc();
         int cpu, vcpu;
 	int max_gvas;
 	uint64_t status = 0xF0F0F0F0F0F0F0F0;
 	printf("hv_vm_tlb_flush is called\n");
-        flush->address_space = 0;
-        flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
-        flush->processor_mask = 0;
+        flush.address_space = 0;
+        flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+        CPU_ZERO(&flush.processor_mask);
 
         if(CPU_CMP(&mask, &all_cpus))
-                flush->flags |= HV_FLUSH_ALL_PROCESSORS;
+                flush.flags |= HV_FLUSH_ALL_PROCESSORS;
         else {
                 CPU_FOREACH_ISSET(cpu, &mask) {
 			vcpu = VMBUS_PCPU_GET(sc, vcpuid, cpu);
-			CPU_SET(vcpu, &flush->processor_mask);
+			CPU_SET(vcpu, &flush.processor_mask);
+		}
 	}
-	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);a
+	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
 	if (pmap == kernel_pmap) {
-		flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
-		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, flush,
-				NULL);
+		flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
+				(uint64_t)NULL);
 	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
-		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, flush,
-				NULL);
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
+				(uint64_t)NULL);
 	} else {
 		return 1;
 	}
 	
-	printf("the status is %d\n", status);
+	printf("the status is %lu\n", status);
 	return status;		
 }
 		

@@ -32,6 +32,11 @@
 #include <sys/taskqueue.h>
 #include <sys/rman.h>
 
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_param.h>
+#include <vm/pmap.h>
+
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcib_private.h>
 
@@ -177,4 +182,15 @@ void    vmbus_synic_teardown1(void);
 int     vmbus_setup_intr1(struct vmbus_softc *sc);
 void    vmbus_intr_teardown1(struct vmbus_softc *sc);
 extern int hv_synic_done;
+
+struct hyperv_tlb_flush {
+        uint64_t address_space;
+        uint64_t flags;
+        cpuset_t processor_mask;
+        uint64_t gva_list[];
+};
+
+uint64_t        hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
+		                vm_offset_t addr2, cpuset_t mask);
+
 #endif	/* !_VMBUS_VAR_H_ */
