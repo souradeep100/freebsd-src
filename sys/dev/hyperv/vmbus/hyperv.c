@@ -90,6 +90,13 @@ hypercall_signal_event(bus_addr_t monprm_paddr)
 	    HYPERCALL_SIGNAL_EVENT, monprm_paddr, 0);
 }
 
+uint64_t
+hypercall_do_md(uint64_t input_val, uint64_t input_addr, uint64_t out_addr)
+{
+	return hypercall_md(hypercall_context.hc_addr,
+			    input_val, input_addr, out_addr);
+}
+
 int
 hyperv_guid2str(const struct hyperv_guid *guid, char *buf, size_t sz)
 {
@@ -171,3 +178,4 @@ hypercall_destroy(void *arg __unused)
 }
 SYSUNINIT(hypercall_dtor, SI_SUB_DRIVERS, SI_ORDER_FIRST, hypercall_destroy,
     NULL);
+
