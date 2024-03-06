@@ -176,4 +176,5 @@ void    vmbus_synic_setup1(void *xsc);
 void    vmbus_synic_teardown1(void);
 int     vmbus_setup_intr1(struct vmbus_softc *sc);
 void    vmbus_intr_teardown1(struct vmbus_softc *sc);
+extern int hv_synic_done;
 #endif	/* !_VMBUS_VAR_H_ */

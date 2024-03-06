@@ -75,6 +75,8 @@
 #include <machine/cpu.h>
 #include <x86/init.h>
 
+#include <dev/hyperv/vmbus/hyperv_var.h>
+#include <dev/hyperv/vmbus/vmbus_var.h>
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
@@ -102,7 +104,7 @@ void *bootpcpu;
 
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
-
+extern int hv_synic_done;
 /*
  * Local data and functions.
  */
@@ -639,7 +641,13 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
-
+	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
+		if(hv_vm_tlb_flush(pmap, addr1, addr2, mask) == 1)
+			goto tlb_nopv;
+		goto hv_end;
+	}
+	
+tlb_nopv:
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
 	PCPU_SET(smp_tlb_pmap, pmap);
@@ -680,6 +688,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	 * preemption, this allows scheduler to select thread on any
 	 * CPU from its cpuset.
 	 */
+hv_end:
 	sched_unpin();
 	critical_exit();
 

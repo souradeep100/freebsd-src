@@ -33,7 +33,18 @@ struct hypercall_ctx {
     void            *hc_addr;
     vm_paddr_t      hc_paddr;
 };
+
+struct hyperv_tlb_flush {
+	uint64_t address_space;
+	uint64_t flags;
+	uint64_t processor_mask;
+	uint64_t gva_list[];
+};
 uint64_t	hypercall_post_message(bus_addr_t msg_paddr);
 uint64_t	hypercall_signal_event(bus_addr_t monprm_paddr);
+uint64_t	hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
+				vm_offset_t addr2, cpuset_t mask);
+uint64_t	hypercall_do_md(uint64_t input, uint64_t in_addr,
+				uint64_t out_addr);
 
 #endif	/* !_HYPERV_VAR_H_ */

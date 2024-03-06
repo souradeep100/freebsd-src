@@ -207,7 +207,7 @@ static driver_t vmbus_driver = {
 	vmbus_methods,
 	sizeof(struct vmbus_softc)
 };
-
+int hv_synic_done = 0;
 DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
 
@@ -784,7 +784,51 @@ vmbus_synic_setup(void *xsc)
 	orig = RDMSR(MSR_HV_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(MSR_HV_SCONTROL, val);
+	hv_synic_done = 1;
 }
+
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE 0x0002
+#define HV_FLUSH_ALL_PROCESSORS BIT(0)
+#define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
+#define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
+
+uint64_t
+hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
+{
+        struct hyperv_tlb_flush *flush;
+	struct vmbus_softc *sc = vmbus_get_softc();
+        int cpu, vcpu;
+	int max_gvas;
+	uint64_t status = 0xF0F0F0F0F0F0F0F0;
+	printf("hv_vm_tlb_flush is called\n");
+        flush->address_space = 0;
+        flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+        flush->processor_mask = 0;
+
+        if(CPU_CMP(&mask, &all_cpus))
+                flush->flags |= HV_FLUSH_ALL_PROCESSORS;
+        else {
+                CPU_FOREACH_ISSET(cpu, &mask) {
+			vcpu = VMBUS_PCPU_GET(sc, vcpuid, cpu);
+			CPU_SET(vcpu, &flush->processor_mask);
+	}
+	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);a
+	if (pmap == kernel_pmap) {
+		flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, flush,
+				NULL);
+	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, flush,
+				NULL);
+	} else {
+		return 1;
+	}
+	
+	printf("the status is %d\n", status);
+	return status;		
+}
+		
+
 
 static void
 vmbus_synic_teardown(void *arg)
