@@ -789,6 +789,12 @@ vmbus_synic_setup(void *xsc)
 #define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
 #define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
 #define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
+
+#define BITS_PER_LONG                   (sizeof(long) * NBBY)
+#define BIT_MASK(nr)            (1UL << ((nr) & (BITS_PER_LONG - 1)))
+#define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
+#define set_bit(i, a)                                                   \
+	    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 uint64_t
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
 {
@@ -800,14 +806,15 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	printf("hv_vm_tlb_flush is called\n");
         flush.address_space = 0;
         flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
-        CPU_ZERO(&flush.processor_mask);
+        //CPU_ZERO(&flush.processor_mask);
+	flush.processor_mask = 0;
 
         if(CPU_CMP(&mask, &all_cpus))
                 flush.flags |= HV_FLUSH_ALL_PROCESSORS;
         else {
                 CPU_FOREACH_ISSET(cpu, &mask) {
 			vcpu = VMBUS_PCPU_GET(sc, vcpuid, cpu);
-			CPU_SET(vcpu, &flush.processor_mask);
+			set_bit(vcpu, &flush.processor_mask);
 		}
 	}
 	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
