@@ -186,7 +186,7 @@ extern int hv_synic_done;
 struct hyperv_tlb_flush {
         uint64_t address_space;
         uint64_t flags;
-        cpuset_t processor_mask;
+        uint64_t processor_mask;
         uint64_t gva_list[];
 };
 
