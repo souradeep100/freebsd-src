@@ -806,10 +806,10 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
-	if (smp_tlb_pmap == PCPU_GET(curpmap)) {
+	if (pmap == PCPU_GET(curpmap)) {
 		flush.address_space = vtophys(pmap);
 		flush.address_space &= 0x000FFFFFFFFFFFFF;
-		flush->flags = 0;
+		flush.flags = 0;
 	} else {
 
         	flush.address_space = 0;
