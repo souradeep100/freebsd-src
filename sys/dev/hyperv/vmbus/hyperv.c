@@ -93,8 +93,9 @@ hypercall_signal_event(bus_addr_t monprm_paddr)
 uint64_t
 hypercall_do_md(uint64_t input_val, uint64_t input_addr, uint64_t out_addr)
 {
+	uint64_t phys = vtophys(input_addr);
 	return hypercall_md(hypercall_context.hc_addr,
-			    input_val, input_addr, out_addr);
+			    input_val, phys, out_addr);
 }
 
 int
