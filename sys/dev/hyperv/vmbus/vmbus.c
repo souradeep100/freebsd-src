@@ -804,10 +804,18 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	int max_gvas;
 	uint64_t status = 0xF0F0F0F0F0F0F0F0;
 	printf("hv_vm_tlb_flush is called\n");
-        flush.address_space = 0;
-        flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
+	if (smp_tlb_pmap == PCPU_GET(curpmap)) {
+		flush.address_space = vtophys(pmap);
+		flush.address_space &= 0x000FFFFFFFFFFFFF;
+		flush->flags = 0;
+	} else {
+
+        	flush.address_space = 0;
+        	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+	}
+
 
         if(CPU_CMP(&mask, &all_cpus))
                 flush.flags |= HV_FLUSH_ALL_PROCESSORS;
@@ -825,6 +833,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 				(uint64_t)NULL);
 	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+		printf("greater than max_gvas\n");
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 				(uint64_t)NULL);
 	} else {
