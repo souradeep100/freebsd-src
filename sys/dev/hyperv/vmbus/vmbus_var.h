@@ -188,7 +188,7 @@ struct hyperv_tlb_flush {
         uint64_t flags;
         uint64_t processor_mask;
         uint64_t gva_list[];
-};
+}__packed;
 
 uint64_t        hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
 		                vm_offset_t addr2, cpuset_t mask);

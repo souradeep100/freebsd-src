@@ -1047,7 +1047,6 @@ invlop_handler(void)
 	u_int initiator_cpu_id;
 	enum invl_op_codes smp_tlb_op;
 	uint32_t *scoreboard, smp_tlb_gen;
-	printf("invlop_handler is called\n");
 	scoreboard = invl_scoreboard_getcpu(PCPU_GET(cpuid));
 	for (;;) {
 		for (initiator_cpu_id = 0; initiator_cpu_id <= mp_maxid;
