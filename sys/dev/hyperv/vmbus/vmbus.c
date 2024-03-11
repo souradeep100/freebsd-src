@@ -795,17 +795,53 @@ vmbus_synic_setup(void *xsc)
 #define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
 #define set_bit(i, a)                                                   \
 	    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+/*
+static inline unsigned int hv_repcomp(u64 status)
+{
+        return (status & HV_HYPERCALL_REP_COMP_MASK) >>
+                         HV_HYPERCALL_REP_COMP_OFFSET;
+}
+
+
+static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
+                                      void *input, void *output)
+{
+        u64 control = code;
+        u64 status;
+        u16 rep_comp;
+
+        control |= (u64)varhead_size << HV_HYPERCALL_VARHEAD_OFFSET;
+        control |= (u64)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
+
+        do {
+                status = hv_do_hypercall(control, input, output);
+                if (!hv_result_success(status))
+                        return status;
+
+                rep_comp = hv_repcomp(status);
+
+                control &= ~HV_HYPERCALL_REP_START_MASK;
+                control |= (u64)rep_comp << HV_HYPERCALL_REP_START_OFFSET;
+                touch_nmi_watchdog();
+        } while (rep_comp < rep_count);
+
+        return status;
+}
+*/
 uint64_t
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
 {
         struct hyperv_tlb_flush flush;
 	struct vmbus_softc *sc = vmbus_get_softc();
         int cpu, vcpu;
-	int max_gvas;
+	//int max_gvas;
 	uint64_t status = 0xF0F0F0F0F0F0F0F0;
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
+	printf("addr1 0x%lx addr2 0x%lx and flush.flags 0x%lx \n", addr1, addr2, flush.flags);
+	if (pmap != kernel_pmap)
+		return 1;
 	if (addr1 == 0) {
         	flush.address_space = 0;
         	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
@@ -825,27 +861,22 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 			set_bit(vcpu, &flush.processor_mask);
 		}
 	}
-	printf("addr1 0x%lx addr2 0x%lx and flush.flags 0x%lx \n", addr1, addr2, flush.flags);
-	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
+	//max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
 	if (addr2 == 0) {
 		printf("pmap is kernel_pmap\n");
 		flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 				(uint64_t)NULL);
-	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
-		printf("greater than max_gvas\n");
-		do {
-			status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
-					(uint64_t)NULL);
-			printf("range flush status %lu\n", status);
-			addr1 += PAGE_SIZE;
-			flush.address_space = vtophys(addr1);
-			flush.address_space &= 0x000FFFFFFFFFFFFF;
-		} while (addr1 < addr2);
+	//} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+	//	printf("greater than max_gvas\n");
+	//	status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
+	//				(uint64_t)NULL);
+	//	printf("range flush status %lu\n", status);
 	} else {
-		return 1;
+
+		status = 1;	
 	}
-	
+
 	printf("the status is %lu\n", status);
 	return status;		
 }
