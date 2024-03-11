@@ -806,7 +806,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
-	if (pmap == kernel_pmap) {
+	if (addr1 == 0) {
         	flush.address_space = 0;
         	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
@@ -827,7 +827,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	}
 	printf("addr1 0x%lx addr2 0x%lx and flush.flags 0x%lx \n", addr1, addr2, flush.flags);
 	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
-	if (pmap == kernel_pmap) {
+	if (addr2 == 0) {
 		printf("pmap is kernel_pmap\n");
 		flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
@@ -837,10 +837,11 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		do {
 			status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 					(uint64_t)NULL);
-			printf("range flush status %d\n", status);
+			printf("range flush status %lu\n", status);
 			addr1 += PAGE_SIZE;
 			flush.address_space = vtophys(addr1);
-		} while (addr1 < addr2)
+			flush.address_space &= 0x000FFFFFFFFFFFFF;
+		} while (addr1 < addr2);
 	} else {
 		return 1;
 	}
