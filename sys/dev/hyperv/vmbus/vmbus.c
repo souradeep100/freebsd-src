@@ -834,7 +834,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
         struct hyperv_tlb_flush flush;
 	struct vmbus_softc *sc = vmbus_get_softc();
         int cpu, vcpu;
-	//int max_gvas;
+	int max_gvas;
 	uint64_t status = 0xF0F0F0F0F0F0F0F0;
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
@@ -858,17 +858,16 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 			set_bit(vcpu, &flush.processor_mask);
 		}
 	}
-	//max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
+	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
 	if (addr2 == 0) {
 		printf("pmap is kernel_pmap\n");
 		flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 				(uint64_t)NULL);
-	//} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
-	//	printf("greater than max_gvas\n");
-	//	status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
-	//				(uint64_t)NULL);
-	//	printf("range flush status %lu\n", status);
+	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+		printf("greater than max_gvas\n");
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
+					(uint64_t)NULL);
 	} else {
 
 		status = 1;	
