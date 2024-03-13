@@ -610,7 +610,6 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	uint32_t generation, *p_cpudone;
 	int cpu;
 	bool is_all;
-
 	/*
 	 * It is not necessary to signal other CPUs while booting or
 	 * when in the debugger.
@@ -631,9 +630,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	if (CPU_EMPTY(&mask))
 		goto local_cb;
 
-	/*
-	 * Initiator must have interrupts enabled, which prevents
-	 * non-invalidation IPIs that take smp_ipi_mtx spinlock,
+	 /* non-invalidation IPIs that take smp_ipi_mtx spinlock,
 	 * from deadlocking with us.  On the other hand, preemption
 	 * must be disabled to pin initiator to the instance of the
 	 * pcpu pc_smp_tlb data and scoreboard line.

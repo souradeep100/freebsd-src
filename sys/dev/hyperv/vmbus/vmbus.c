@@ -839,16 +839,13 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
-	printf("addr1 0x%lx addr2 0x%lx and flush.flags 0x%lx \n", addr1, addr2, flush.flags);
-	if (pmap != kernel_pmap)
-		return 1;
+	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
 	if (addr1 == 0) {
         	flush.address_space = 0;
         	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
 
-		flush.address_space = vtophys(addr1);
-		flush.address_space &= 0x000FFFFFFFFFFFFF;
+		flush.address_space = rcr3();
 		flush.flags = 0;
 	}
 
