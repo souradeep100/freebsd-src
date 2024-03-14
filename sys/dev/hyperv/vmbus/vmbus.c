@@ -795,7 +795,40 @@ vmbus_synic_setup(void *xsc)
 #define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
 #define set_bit(i, a)                                                   \
 	    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+
 /*
+ *
+ * Fills in gva_list starting from offset. Returns the number of items added.
+ */
+static inline int fill_gva_list(u64 gva_list[], int offset,
+                                unsigned long start, unsigned long end)
+{
+        int gva_n = offset;
+        unsigned long cur = start, diff;
+
+        do {
+                diff = end > cur ? end - cur : 0;
+
+                gva_list[gva_n] = cur & PAGE_MASK;
+                /*
+                 * Lower 12 bits encode the number of additional
+                 * pages to flush (in addition to the 'cur' page).
+                 */
+                if (diff >= HV_TLB_FLUSH_UNIT) {
+                        gva_list[gva_n] |= ~PAGE_MASK;
+                        cur += HV_TLB_FLUSH_UNIT;
+                }  else if (diff) {
+                        gva_list[gva_n] |= (diff - 1) >> PAGE_SHIFT;
+                        cur = end;
+                }
+
+                gva_n++;
+
+        } while (cur < end);
+
+        return gva_n - offset;
+}
+
 static inline unsigned int hv_repcomp(u64 status)
 {
         return (status & HV_HYPERCALL_REP_COMP_MASK) >>
@@ -827,15 +860,15 @@ static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
 
         return status;
 }
-*/
+
 uint64_t
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
 {
         struct hyperv_tlb_flush flush;
 	struct vmbus_softc *sc = vmbus_get_softc();
         int cpu, vcpu;
-	int max_gvas;
-	uint64_t status = 0xF0F0F0F0F0F0F0F0;
+	int max_gvas, gva_n;
+	uint64_t status = 0;
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
@@ -869,8 +902,11 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 					(uint64_t)NULL);
 	} else {
-
-		status = 1;	
+		printf("doing list flush\n");
+	        gva_n = fill_gva_list(flush->gva_list, 0,
+                                      addr1, addr2);
+                status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
+                                             gva_n, 0, flush, NULL);
 	}
 
 	printf("the status is %lu\n", status);
