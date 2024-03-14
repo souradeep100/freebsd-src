@@ -71,6 +71,19 @@
 	 MSR_HV_GUESTID_VERSION_FREEBSD | \
 	 MSR_HV_GUESTID_OSID_FREEBSD |	\
 	 MSR_HV_GUESTID_OSTYPE_FREEBSD)
+#ifndef GENMASK_ULL
+#define GENMASK_ULL(high, low)  ((0xFFFFFFFFFFFFFFFFULL >> (64ULL - ((high) - (low) + 1ULL))) << (low))
+#endif
+#define HV_HYPERCALL_RESULT_MASK        GENMASK_ULL(15, 0)
+#define HV_STATUS_SUCCESS 0
+#define HV_HYPERCALL_REP_COMP_MASK      GENMASK_ULL(43, 32)
+#define HV_HYPERCALL_REP_COMP_OFFSET 32
+
+#define HV_HYPERCALL_VARHEAD_OFFSET 17
+
+#define HV_HYPERCALL_REP_COMP_OFFSET 32
+#define HV_HYPERCALL_REP_START_MASK     GENMASK_ULL(59, 48)
+#define HV_HYPERCALL_REP_START_OFFSET   48
 
 static bool			hyperv_identify(void);
 static void			hypercall_memfree(void);
@@ -88,6 +101,54 @@ hypercall_signal_event(bus_addr_t monprm_paddr)
 {
 	return hypercall_md(hypercall_context.hc_addr,
 	    HYPERCALL_SIGNAL_EVENT, monprm_paddr, 0);
+}
+
+static inline int hv_result(uint64_t status)
+{
+        return status & HV_HYPERCALL_RESULT_MASK;
+}
+
+static inline bool hv_result_success(uint64_t status)
+{
+        return hv_result(status) == HV_STATUS_SUCCESS;
+}
+
+static inline unsigned int hv_repcomp(uint64_t status)
+{
+        /* Bits [43:32] of status have 'Reps completed' data. */
+        return (status & HV_HYPERCALL_REP_COMP_MASK) >>
+                         HV_HYPERCALL_REP_COMP_OFFSET;
+}
+
+
+/*
+ * Rep hypercalls. Callers of this functions are supposed to ensure that
+ * rep_count and varhead_size comply with Hyper-V hypercall definition.
+ */
+uint64_t 
+hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
+                                      void *input, void *output)
+{
+        uint64_t control = code;
+        uint64_t status;
+        uint16_t rep_comp;
+
+        control |= (uint64_t)varhead_size << HV_HYPERCALL_VARHEAD_OFFSET;
+        control |= (uint64_t)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
+
+        do {
+                status = hypercall_do_md(control, input, output);
+                if (!hv_result_success(status))
+                        return status;
+
+                rep_comp = hv_repcomp(status);
+
+                control &= ~HV_HYPERCALL_REP_START_MASK;
+                control |= (uint64_t)rep_comp << HV_HYPERCALL_REP_START_OFFSET;
+
+        } while (rep_comp < rep_count);
+
+        return status;
 }
 
 uint64_t
