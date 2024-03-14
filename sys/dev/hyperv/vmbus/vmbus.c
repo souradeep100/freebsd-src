@@ -840,12 +840,12 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
 	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
-	if (addr1 == 0) {
+	if (pmap->pm_cr3 == PMAP_NO_CR3) {
         	flush.address_space = 0;
         	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
 
-		flush.address_space = rcr3();
+		flush.address_space = pmap->pm_cr3;
 		flush.flags = 0;
 	}
 
