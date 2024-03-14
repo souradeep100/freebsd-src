@@ -800,7 +800,7 @@ vmbus_synic_setup(void *xsc)
  *
  * Fills in gva_list starting from offset. Returns the number of items added.
  */
-static inline int fill_gva_list(u64 gva_list[], int offset,
+static inline int fill_gva_list(uint64_t gva_list[], int offset,
                                 unsigned long start, unsigned long end)
 {
         int gva_n = offset;
@@ -829,38 +829,7 @@ static inline int fill_gva_list(u64 gva_list[], int offset,
         return gva_n - offset;
 }
 
-static inline unsigned int hv_repcomp(u64 status)
-{
-        return (status & HV_HYPERCALL_REP_COMP_MASK) >>
-                         HV_HYPERCALL_REP_COMP_OFFSET;
-}
-
-
-static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
-                                      void *input, void *output)
-{
-        u64 control = code;
-        u64 status;
-        u16 rep_comp;
-
-        control |= (u64)varhead_size << HV_HYPERCALL_VARHEAD_OFFSET;
-        control |= (u64)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
-
-        do {
-                status = hv_do_hypercall(control, input, output);
-                if (!hv_result_success(status))
-                        return status;
-
-                rep_comp = hv_repcomp(status);
-
-                control &= ~HV_HYPERCALL_REP_START_MASK;
-                control |= (u64)rep_comp << HV_HYPERCALL_REP_START_OFFSET;
-                touch_nmi_watchdog();
-        } while (rep_comp < rep_count);
-
-        return status;
-}
-
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST 0x0003
 uint64_t
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
 {
@@ -903,10 +872,10 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 					(uint64_t)NULL);
 	} else {
 		printf("doing list flush\n");
-	        gva_n = fill_gva_list(flush->gva_list, 0,
+	        gva_n = fill_gva_list(flush.gva_list, 0,
                                       addr1, addr2);
                 status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
-                                             gva_n, 0, flush, NULL);
+                                             gva_n, 0, (void*)&flush, NULL);
 	}
 
 	printf("the status is %lu\n", status);

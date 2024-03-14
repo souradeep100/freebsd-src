@@ -137,7 +137,7 @@ hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
         control |= (uint64_t)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
 
         do {
-                status = hypercall_do_md(control, input, output);
+                status = hypercall_do_md(control, (uint64_t)input, (uint64_t)output);
                 if (!hv_result_success(status))
                         return status;
 
