@@ -71,9 +71,12 @@
 	 MSR_HV_GUESTID_VERSION_FREEBSD | \
 	 MSR_HV_GUESTID_OSID_FREEBSD |	\
 	 MSR_HV_GUESTID_OSTYPE_FREEBSD)
-#ifndef GENMASK_ULL
-#define GENMASK_ULL(high, low)  ((0xFFFFFFFFFFFFFFFFULL >> (64ULL - ((high) - (low) + 1ULL))) << (low))
-#endif
+
+//#define GENMASK_ULL(h, l) \
+  //  (((~0ULL) << (l)) & (~0ULL >> (64 - (h) - 1)))
+
+#define GENMASK_ULL(h, l)  (((~0ULL) >> (64 - (h) - 1)) & ((~0ULL) << (l)))
+
 #define HV_HYPERCALL_RESULT_MASK        GENMASK_ULL(15, 0)
 #define HV_STATUS_SUCCESS 0
 #define HV_HYPERCALL_REP_COMP_MASK      GENMASK_ULL(43, 32)
@@ -81,7 +84,6 @@
 
 #define HV_HYPERCALL_VARHEAD_OFFSET 17
 
-#define HV_HYPERCALL_REP_COMP_OFFSET 32
 #define HV_HYPERCALL_REP_START_MASK     GENMASK_ULL(59, 48)
 #define HV_HYPERCALL_REP_START_OFFSET   48
 
