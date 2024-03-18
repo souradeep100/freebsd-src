@@ -838,6 +838,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
         int cpu, vcpu;
 	int max_gvas, gva_n;
 	uint64_t status = 0;
+
 	printf("hv_vm_tlb_flush is called\n");
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
@@ -850,8 +851,6 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		flush.address_space = pmap->pm_cr3;
 		flush.flags = 0;
 	}
-
-
         if(CPU_CMP(&mask, &all_cpus))
                 flush.flags |= HV_FLUSH_ALL_PROCESSORS;
         else {
@@ -871,14 +870,17 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 					(uint64_t)NULL);
 	} else {
-		printf("doing list flush\n");
-	        gva_n = fill_gva_list(flush.gva_list, 0,
+	
+		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush.address_space, addr1);
+       		gva_n = fill_gva_list(flush.gva_list, 0,
                                       addr1, addr2);
-                status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
+               	status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
                                              gva_n, 0, (void*)&flush, NULL);
+		printf("the status of list flush 0x%lx gva_n %d\n", status, gva_n);
+
 	}
 
-	printf("the status is %lu\n", status);
+	printf("the status is 0x%lx\n", status);
 	return status;		
 }
 		
