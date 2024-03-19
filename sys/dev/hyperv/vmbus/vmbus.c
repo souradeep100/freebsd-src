@@ -788,7 +788,7 @@ vmbus_synic_setup(void *xsc)
 #define HV_FLUSH_ALL_PROCESSORS BIT(0)
 #define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
 #define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
-#define HV_TLB_FLUSH_UNIT 4096 * PAGE_SIZE
+#define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
 
 
 #define BITS_PER_LONG                   (sizeof(long) * NBBY)
@@ -810,13 +810,13 @@ static inline int fill_gva_list(uint64_t gva_list[], int offset,
         do {
                 diff = end > cur ? end - cur : 0;
 
-                gva_list[gva_n] = cur & PAGE_MASK;
+                gva_list[gva_n] = trunc_page(cur);
                 /*
                  * Lower 12 bits encode the number of additional
                  * pages to flush (in addition to the 'cur' page).
                  */
                 if (diff >= HV_TLB_FLUSH_UNIT) {
-                        gva_list[gva_n] |= ~PAGE_MASK;
+                        gva_list[gva_n] |= PAGE_MASK;
                         cur += HV_TLB_FLUSH_UNIT;
                 }  else if (diff) {
                         gva_list[gva_n] |= (diff - 1) >> PAGE_SHIFT;
@@ -883,9 +883,13 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush.address_space, addr1);
        		gva_n = fill_gva_list(flush.gva_list, 0,
                                       addr1, addr2);
+		int c ;
+		for (c = 0; c < gva_n; c++)
+			printf("flush.gva_list[%d] 0x%lx\n", c, flush.gva_list[c]);
+
                	status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
                                              gva_n, 0, (uint64_t)&flush, (uint64_t)NULL);
-		printf("the status of list flush 0x%lx gva_n %d\n", status, gva_n);
+		printf("the status of list flush 0x%lx \n", status);
 
 	}
 
