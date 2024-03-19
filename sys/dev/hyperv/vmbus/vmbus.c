@@ -788,7 +788,8 @@ vmbus_synic_setup(void *xsc)
 #define HV_FLUSH_ALL_PROCESSORS BIT(0)
 #define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
 #define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
-#define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
+#define HV_TLB_FLUSH_UNIT 4096 * PAGE_SIZE
+
 
 #define BITS_PER_LONG                   (sizeof(long) * NBBY)
 #define BIT_MASK(nr)            (1UL << ((nr) & (BITS_PER_LONG - 1)))
@@ -854,10 +855,18 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
         if(CPU_CMP(&mask, &all_cpus))
                 flush.flags |= HV_FLUSH_ALL_PROCESSORS;
         else {
+		if (CPU_FLS(&mask)  < mp_ncpus && CPU_FLS(&mask) >= 64)
+			return 1;
+
                 CPU_FOREACH_ISSET(cpu, &mask) {
 			vcpu = VMBUS_PCPU_GET(sc, vcpuid, cpu);
+			if (vcpu >= 64)
+				return 1;
+
 			set_bit(vcpu, &flush.processor_mask);
 		}
+		if (! flush.processor_mask )
+			return 1;
 	}
 	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
 	if (addr2 == 0) {
@@ -875,7 +884,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
        		gva_n = fill_gva_list(flush.gva_list, 0,
                                       addr1, addr2);
                	status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
-                                             gva_n, 0, (void*)&flush, NULL);
+                                             gva_n, 0, (uint64_t)&flush, (uint64_t)NULL);
 		printf("the status of list flush 0x%lx gva_n %d\n", status, gva_n);
 
 	}

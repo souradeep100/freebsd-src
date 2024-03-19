@@ -41,6 +41,6 @@ uint64_t	hypercall_do_md(uint64_t input, uint64_t in_addr,
 
 uint64_t
 hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
-                                      void *input, void *output);
+                                      uint64_t input, uint64_t output);
 
 #endif	/* !_HYPERV_VAR_H_ */
