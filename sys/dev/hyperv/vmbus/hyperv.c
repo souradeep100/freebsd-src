@@ -112,6 +112,8 @@ static inline int hv_result(uint64_t status)
 
 static inline bool hv_result_success(uint64_t status)
 {
+	printf("the status is 0x%lx\n", status);
+	printf("the result 0x%x\n", hv_result(status));
         return hv_result(status) == HV_STATUS_SUCCESS;
 }
 
@@ -129,7 +131,7 @@ static inline unsigned int hv_repcomp(uint64_t status)
  */
 uint64_t 
 hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
-                                      void *input, void *output)
+                                      uint64_t input, uint64_t output)
 {
         uint64_t control = code;
         uint64_t status;
@@ -139,7 +141,7 @@ hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
         control |= (uint64_t)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
 
         do {
-                status = hypercall_do_md(control, (uint64_t)input, (uint64_t)output);
+                status = hypercall_do_md(control, input, output);
                 if (!hv_result_success(status))
                         return status;
 
@@ -156,9 +158,11 @@ hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
 uint64_t
 hypercall_do_md(uint64_t input_val, uint64_t input_addr, uint64_t out_addr)
 {
-	uint64_t phys = vtophys(input_addr);
+	uint64_t phys_inaddr, phys_outaddr;
+	phys_inaddr = input_addr ? vtophys(input_addr) : 0;
+	phys_outaddr = out_addr ? vtophys(out_addr) : 0;
 	return hypercall_md(hypercall_context.hc_addr,
-			    input_val, phys, out_addr);
+			    input_val, phys_inaddr, phys_outaddr);
 }
 
 int
