@@ -810,7 +810,7 @@ static inline int fill_gva_list(uint64_t gva_list[], int offset,
         do {
                 diff = end > cur ? end - cur : 0;
 
-                gva_list[gva_n] = trunc_page(cur);
+                gva_list[gva_n] = cur;
                 /*
                  * Lower 12 bits encode the number of additional
                  * pages to flush (in addition to the 'cur' page).
@@ -839,17 +839,23 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
         int cpu, vcpu;
 	int max_gvas, gva_n;
 	uint64_t status = 0;
-
-	printf("hv_vm_tlb_flush is called\n");
+	uint64_t cr3;
+//	printf("hv_vm_tlb_flush is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
         //CPU_ZERO(&flush.processor_mask);
 	flush.processor_mask = 0;
-	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
-	if (pmap->pm_cr3 == PMAP_NO_CR3) {
+//	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
+	cr3 = pmap->pm_cr3;
+//	if (pmap == kernel_pmap) {
+//		printf("pmap == kernel_pmap  0x%lx\n", cr3);
+//	}
+
+	if (cr3 == PMAP_NO_CR3) {
         	flush.address_space = 0;
         	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
 
-		flush.address_space = pmap->pm_cr3;
+		flush.address_space = cr3;
+		flush.address_space &= ~CR3_PCID_MASK;
 		flush.flags = 0;
 	}
         if(CPU_CMP(&mask, &all_cpus))
@@ -870,30 +876,30 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	}
 	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
 	if (addr2 == 0) {
-		printf("pmap is kernel_pmap\n");
+//		printf("pmap is TLB ALL\n");
 		flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 				(uint64_t)NULL);
 	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
-		printf("greater than max_gvas\n");
+//		printf("greater than max_gvas\n");
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 					(uint64_t)NULL);
 	} else {
 	
-		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush.address_space, addr1);
+//		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush.address_space, addr1);
        		gva_n = fill_gva_list(flush.gva_list, 0,
                                       addr1, addr2);
-		int c ;
-		for (c = 0; c < gva_n; c++)
-			printf("flush.gva_list[%d] 0x%lx\n", c, flush.gva_list[c]);
+//		int c ;
+//		for (c = 0; c < gva_n; c++)
+//			printf("flush.gva_list[%d] 0x%lx\n", c, flush.gva_list[c]);
 
                	status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
                                              gva_n, 0, (uint64_t)&flush, (uint64_t)NULL);
-		printf("the status of list flush 0x%lx \n", status);
+//		printf("the status of list flush 0x%lx \n", status);
 
 	}
 
-	printf("the status is 0x%lx\n", status);
+//	printf("the status is 0x%lx\n", status);
 	return status;		
 }
 		

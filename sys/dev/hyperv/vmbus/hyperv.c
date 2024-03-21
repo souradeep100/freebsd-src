@@ -112,8 +112,8 @@ static inline int hv_result(uint64_t status)
 
 static inline bool hv_result_success(uint64_t status)
 {
-	printf("the status is 0x%lx\n", status);
-	printf("the result 0x%x\n", hv_result(status));
+//	printf("the status is 0x%lx\n", status);
+//	printf("the result 0x%x\n", hv_result(status));
         return hv_result(status) == HV_STATUS_SUCCESS;
 }
 
@@ -140,6 +140,7 @@ hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
         control |= (uint64_t)varhead_size << HV_HYPERCALL_VARHEAD_OFFSET;
         control |= (uint64_t)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
 
+//	printf("1 :the control 0x%lx and rep_count 0x%x\n", control, rep_count);
         do {
                 status = hypercall_do_md(control, input, output);
                 if (!hv_result_success(status))
@@ -149,8 +150,11 @@ hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
 
                 control &= ~HV_HYPERCALL_REP_START_MASK;
                 control |= (uint64_t)rep_comp << HV_HYPERCALL_REP_START_OFFSET;
+//		printf("the control 0x%lx and rep_comp 0x%x and rep_count 0x%x\n", control, rep_comp, rep_count);
 
         } while (rep_comp < rep_count);
+	if (hv_result_success(status))
+		return HV_STATUS_SUCCESS;
 
         return status;
 }
