@@ -638,7 +638,13 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
-	
+	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
+		if(hv_vm_tlb_flush(pmap, addr1, addr2, mask) != 0)
+			goto tlb_nopv;
+		goto hv_end;
+	}
+
+tlb_nopv:
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
 	PCPU_SET(smp_tlb_pmap, pmap);
@@ -648,12 +654,6 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	PCPU_SET(smp_tlb_gen, generation);
 	PCPU_SET(smp_tlb_op, op);
 	/* Fence between filling smp_tlb fields and clearing scoreboard. */
-	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
-		if(hv_vm_tlb_flush(pmap, addr1, addr2, mask) != 0)
-			goto tlb_nopv;
-		goto hv_end;
-	}
-tlb_nopv:
 	atomic_thread_fence_rel();
 
 	CPU_FOREACH_ISSET(cpu, &mask) {
