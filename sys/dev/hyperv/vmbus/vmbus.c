@@ -729,6 +729,8 @@ vmbus_handle_intr(struct trapframe *trap_frame)
 	critical_exit();
 }
 
+uint32_t hv_max_vp_index;
+
 static void
 vmbus_synic_setup(void *xsc)
 {
@@ -745,6 +747,8 @@ vmbus_synic_setup(void *xsc)
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
 	}
 
+	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
+		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
 	/*
 	 * Setup the SynIC message.
 	 */
@@ -902,9 +906,90 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 //	printf("the status is 0x%lx\n", status);
 	return status;		
 }
-		
+#if 0	
+static uint64_t 
+hv_flush_tlb_others_ex(pmap_t pmap, const struct cpumask *cpus,
+                                      const struct flush_tlb_info *info)
+{
+        int nr_bank = 0, max_gvas, gva_n;
+        struct hv_tlb_flush_ex flush;
+        uint64_t status;
 
+       // if (!(ms_hyperv.hints & HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))
+         //       return HV_STATUS_INVALID_PARAMETER;
 
+        //flush = *this_cpu_ptr(hyperv_pcpu_input_arg);
+	uint64_t status = 0;
+	uint64_t cr3;
+//	printf("hv_vm_tlb_flush is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
+        //CPU_ZERO(&flush.processor_mask);
+	
+//	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
+	cr3 = pmap->pm_cr3;
+//	if (pmap == kernel_pmap) {
+//		printf("pmap == kernel_pmap  0x%lx\n", cr3);
+//	}
+
+	if (cr3 == PMAP_NO_CR3) {
+        	flush.address_space = 0;
+        	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+	} else {
+
+		flush.address_space = cr3;
+		flush.address_space &= ~CR3_PCID_MASK;
+		flush.flags = 0;
+	}
+        if (info->mm) {
+                /*
+                 * AddressSpace argument must match the CR3 with PCID bits
+                 * stripped out.
+                 */
+                flush.address_space = 
+                flush->address_space &= CR3_ADDR_MASK;
+                flush->flags = 0;
+        } else {
+                flush->address_space = 0;
+                flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+        }
+
+        flush->hv_vp_set.valid_bank_mask = 0;
+
+        flush->hv_vp_set.format = HV_GENERIC_SET_SPARSE_4K;
+        nr_bank = cpumask_to_vpset_skip(&flush->hv_vp_set, cpus,
+                        info->freed_tables ? NULL : cpu_is_lazy);
+        if (nr_bank < 0)
+                return HV_STATUS_INVALID_PARAMETER;
+
+        /*
+         * We can flush not more than max_gvas with one hypercall. Flush the
+         * whole address space if we were asked to do more.
+         */
+        max_gvas =
+                (PAGE_SIZE - sizeof(*flush) - nr_bank *
+                 sizeof(flush->hv_vp_set.bank_contents[0])) /
+                sizeof(flush->gva_list[0]);
+
+        if (info->end == TLB_FLUSH_ALL) {
+                flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
+                status = hv_do_rep_hypercall(
+                        HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
+                        0, nr_bank, flush, NULL);
+        } else if (info->end &&
+                   ((info->end - info->start)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+                status = hv_do_rep_hypercall(
+                        HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
+                        0, nr_bank, flush, NULL);
+        } else {
+                gva_n = fill_gva_list(flush->gva_list, nr_bank,
+                                      info->start, info->end);
+                status = hv_do_rep_hypercall(
+                        HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX,
+                        gva_n, nr_bank, flush, NULL);
+        }
+
+        return status;
+}
+#endif
 static void
 vmbus_synic_teardown(void *arg)
 {
