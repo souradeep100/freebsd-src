@@ -182,6 +182,7 @@ void    vmbus_synic_teardown1(void);
 int     vmbus_setup_intr1(struct vmbus_softc *sc);
 void    vmbus_intr_teardown1(struct vmbus_softc *sc);
 extern int hv_synic_done;
+extern uint32_t hv_max_vp_index;
 
 struct hyperv_tlb_flush {
         uint64_t address_space;
@@ -189,6 +190,19 @@ struct hyperv_tlb_flush {
         uint64_t processor_mask;
         uint64_t gva_list[];
 }__packed;
+
+struct hv_vpset {
+        uint64_t format;
+        uint64_t valid_bank_mask;
+        uint64_t bank_contents[];
+} __packed;
+
+struct hv_tlb_flush_ex {
+        uint64_t address_space;
+        uint64_t flags;
+        uint64_t gva_list[];
+        //struct hv_vpset hv_vp_set;
+} __packed;
 
 uint64_t        hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
 		                vm_offset_t addr2, cpuset_t mask);

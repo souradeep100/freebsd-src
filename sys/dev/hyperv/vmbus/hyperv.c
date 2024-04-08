@@ -35,6 +35,7 @@
 #include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/timetc.h>
+#include <sys/cpuset.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -50,6 +51,7 @@
 #include <dev/hyperv/vmbus/x86/hyperv_machdep.h>
 #include <dev/hyperv/vmbus/x86/hyperv_reg.h>
 #endif
+#include <dev/hyperv/vmbus/vmbus_var.h>
 #include <dev/hyperv/vmbus/hyperv_common_reg.h>
 #include <dev/hyperv/vmbus/hyperv_var.h>
 
@@ -86,11 +88,14 @@
 
 #define HV_HYPERCALL_REP_START_MASK     GENMASK_ULL(59, 48)
 #define HV_HYPERCALL_REP_START_OFFSET   48
+#define HV_VCPUS_PER_SPARSE_BANK (64)
+#define HV_MAX_SPARSE_VCPU_BANKS (64)
 
 static bool			hyperv_identify(void);
 static void			hypercall_memfree(void);
 
 static struct hypercall_ctx	hypercall_context;
+
 uint64_t
 hypercall_post_message(bus_addr_t msg_paddr)
 {
@@ -124,7 +129,52 @@ static inline unsigned int hv_repcomp(uint64_t status)
                          HV_HYPERCALL_REP_COMP_OFFSET;
 }
 
+#define BITS_PER_LONG                   (sizeof(long) * NBBY)
+#define BIT_MASK(nr)            (1UL << ((nr) & (BITS_PER_LONG - 1)))
+#define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
+#define set_bit(i, a)			\
+		atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
+#if 1
+static inline int hv_cpumask_to_vpset(struct hv_vpset *vpset,
+                                    const cpuset_t *cpus,
+                                    struct vmbus_softc * sc)
+{
+        int cpu, vcpu, vcpu_bank, vcpu_offset, nr_bank = 1;
+        int max_vcpu_bank = hv_max_vp_index / HV_VCPUS_PER_SPARSE_BANK;
+
+        /* vpset.valid_bank_mask can represent up to HV_MAX_SPARSE_VCPU_BANKS banks */
+        if (max_vcpu_bank >= HV_MAX_SPARSE_VCPU_BANKS)
+                return 0;
+
+        /*
+         * Clear all banks up to the maximum possible bank as hv_tlb_flush_ex
+         * structs are not cleared between calls, we risk flushing unneeded
+         * vCPUs otherwise.
+         */
+        for (vcpu_bank = 0; vcpu_bank <= max_vcpu_bank; vcpu_bank++)
+                vpset->bank_contents[vcpu_bank] = 0;
+
+        /*
+         * Some banks may end up being empty but this is acceptable.
+         */
+        CPU_FOREACH_ISSET(cpu, cpus) {
+                vcpu = VMBUS_PCPU_GET(sc, vcpuid, cpu);
+                if (vcpu == -1)
+                        return -1;
+                vcpu_bank = vcpu / HV_VCPUS_PER_SPARSE_BANK;
+                vcpu_offset = vcpu % HV_VCPUS_PER_SPARSE_BANK;
+                set_bit(vcpu_offset, (unsigned long *)
+                          &vpset->bank_contents[vcpu_bank]);
+                if (vcpu_bank >= nr_bank)
+                        nr_bank = vcpu_bank + 1;
+        }
+        vpset->valid_bank_mask = GENMASK_ULL(nr_bank - 1, 0);
+        return nr_bank;
+}
+
+
+#endif
 /*
  * Rep hypercalls. Callers of this functions are supposed to ensure that
  * rep_count and varhead_size comply with Hyper-V hypercall definition.
