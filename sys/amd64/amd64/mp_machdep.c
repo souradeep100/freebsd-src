@@ -642,7 +642,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
 		if(hv_vm_tlb_flush(pmap, addr1, addr2, mask) != 0) 
 			goto tlb_nopv;
-		
+
 		goto hv_end;
 	}
 
