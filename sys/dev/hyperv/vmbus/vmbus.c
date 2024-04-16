@@ -790,6 +790,7 @@ vmbus_synic_setup(void *xsc)
 }
 
 #define HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE 0x0002
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX 0x0013
 #define HV_FLUSH_ALL_PROCESSORS BIT(0)
 #define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
 #define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
@@ -909,15 +910,18 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 //	printf("the status is 0x%lx\n", status);
 	return status;		
 }
-#if 0	
-static uint64_t 
-hv_flush_tlb_others_ex(pmap_t pmap, const struct cpumask *cpus,
-                                      const struct flush_tlb_info *info)
+#if 1
+#define HV_STATUS_INVALID_PARAMETER 5
+enum HV_GENERIC_SET_FORMAT {
+	HV_GENERIC_SET_SPARSE_4K,
+	HV_GENERIC_SET_ALL,
+};
+uint64_t 
+hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const cpuset_t mask)
 {
-        int nr_bank = 0, max_gvas, gva_n;
+        int nr_bank = 0, max_gvas;
         struct hv_tlb_flush_ex flush;
-        uint64_t status;
-
+	struct vmbus_softc *sc = vmbus_get_softc();
        // if (!(ms_hyperv.hints & HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))
          //       return HV_STATUS_INVALID_PARAMETER;
 
@@ -942,23 +946,23 @@ hv_flush_tlb_others_ex(pmap_t pmap, const struct cpumask *cpus,
 		flush.address_space &= ~CR3_PCID_MASK;
 		flush.flags = 0;
 	}
-        if (info->mm) {
-                /*
-                 * AddressSpace argument must match the CR3 with PCID bits
-                 * stripped out.
-                 */
-                flush.address_space = 
-                flush->address_space &= CR3_ADDR_MASK;
-                flush->flags = 0;
-        } else {
-                flush->address_space = 0;
-                flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
-        }
+       // if (info->mm) {
+       //         /*
+       //          * AddressSpace argument must match the CR3 with PCID bits
+       //          * stripped out.
+       //          */
+       //         flush.address_space = 
+       //         flush->address_space &= CR3_ADDR_MASK;
+       //         flush->flags = 0;
+       // } else {
+       //         flush->address_space = 0;
+       //         flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+       // }
 
-        flush->hv_vp_set.valid_bank_mask = 0;
+        flush.hv_vp_set.valid_bank_mask = 0;
 
-        flush->hv_vp_set.format = HV_GENERIC_SET_SPARSE_4K;
-        nr_bank = cpumask_to_vpset_skip(&flush->hv_vp_set, cpus);
+        flush.hv_vp_set.format = HV_GENERIC_SET_SPARSE_4K;
+        nr_bank = hv_cpumask_to_vpset(&flush.hv_vp_set, &mask, sc);
                        
         if (nr_bank < 0)
                 return HV_STATUS_INVALID_PARAMETER;
@@ -968,28 +972,31 @@ hv_flush_tlb_others_ex(pmap_t pmap, const struct cpumask *cpus,
          * whole address space if we were asked to do more.
          */
         max_gvas =
-                (PAGE_SIZE - sizeof(*flush) - nr_bank *
-                 sizeof(flush->hv_vp_set.bank_contents[0])) /
-                sizeof(flush->gva_list[0]);
+                (PAGE_SIZE - sizeof(flush) - nr_bank *
+                 sizeof(flush.hv_vp_set.bank_contents[0])) /
+                sizeof(flush.gva_list[0]);
 
-        if (info->end == TLB_FLUSH_ALL) {
-                flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
+        if (addr2 == 0) {
+		printf("pmap is TLB ALL\n");
+                flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
-                        0, nr_bank, flush, NULL);
-        } else if (info->end &&
-                   ((info->end - info->start)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+                        0, nr_bank, (uint64_t)&flush, (uint64_t)NULL);
+        } else if (addr2 &&
+                   ((addr2 - addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
+		printf("greater than max_gvas\n");
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
-                        0, nr_bank, flush, NULL);
+                        0, nr_bank, (uint64_t)&flush, (uint64_t)NULL);
         } else {
-                gva_n = fill_gva_list(flush->gva_list, nr_bank,
-                                      info->start, info->end);
-                status = hv_do_rep_hypercall(
-                        HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX,
-                        gva_n, nr_bank, flush, NULL);
+             //   gva_n = fill_gva_list(flush->gva_list, nr_bank,
+             //                         info->start, info->end);
+             //   status = hv_do_rep_hypercall(
+             //           HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX,
+             //           gva_n, nr_bank, flush, NULL);
+	     return 1;
         }
-
+	printf("status is 0x%lx\n",status);
         return status;
 }
 #endif
