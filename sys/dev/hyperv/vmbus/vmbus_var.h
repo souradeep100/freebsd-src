@@ -79,6 +79,7 @@ struct vmbus_pcpu_data {
 	struct taskqueue	*event_tq;	/* event taskq */
 	struct taskqueue	*message_tq;	/* message taskq */
 	struct task		message_task;	/* message task */
+	void			*pcpu_ptr;
 } __aligned(CACHE_LINE_SIZE);
 
 struct vmbus_softc {
