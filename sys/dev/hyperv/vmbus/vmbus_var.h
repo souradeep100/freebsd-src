@@ -201,11 +201,12 @@ struct hv_vpset {
 struct hv_tlb_flush_ex {
         uint64_t address_space;
         uint64_t flags;
+        struct hv_vpset hv_vp_set;
         uint64_t gva_list[];
-        //struct hv_vpset hv_vp_set;
 } __packed;
 
 uint64_t        hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
 		                vm_offset_t addr2, cpuset_t mask);
-
+uint64_t	hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1,
+		                vm_offset_t addr2, cpuset_t mask);
 #endif	/* !_VMBUS_VAR_H_ */

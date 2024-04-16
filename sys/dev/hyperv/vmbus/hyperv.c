@@ -136,7 +136,7 @@ static inline unsigned int hv_repcomp(uint64_t status)
 		atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
 #if 1
-static inline int hv_cpumask_to_vpset(struct hv_vpset *vpset,
+inline int hv_cpumask_to_vpset(struct hv_vpset *vpset,
                                     const cpuset_t *cpus,
                                     struct vmbus_softc * sc)
 {

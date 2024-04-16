@@ -45,6 +45,7 @@ CWARNEXTRA?=	-Wno-error=tautological-compare -Wno-error=empty-body \
 		-Wno-error=pointer-sign
 CWARNEXTRA+=	-Wno-error=shift-negative-value
 CWARNEXTRA+=	-Wno-address-of-packed-member
+CWARNEXTRA+=	-Wno-gnu-variable-sized-type-not-at-end
 .endif	# clang
 
 .if ${COMPILER_TYPE} == "gcc"
@@ -64,7 +65,8 @@ CWARNEXTRA?=	-Wno-error=address				\
 		-Wno-error=sequence-point			\
 		-Wno-error=shift-overflow			\
 		-Wno-error=tautological-compare			\
-		-Wno-error=unused-function
+		-Wno-error=unused-function			\
+		-Wno-gnu-variable-sized-type-not-at-end
 .if ${COMPILER_VERSION} >= 70100
 CWARNEXTRA+=	-Wno-error=stringop-overflow
 .endif
