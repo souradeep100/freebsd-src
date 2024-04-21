@@ -747,7 +747,7 @@ vmbus_synic_setup(void *xsc)
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
 	}
 
-	VMBUS_PCPU_GET(sc, pcpu_ptr, cpu) =  malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
+//	VMBUS_PCPU_GET(sc, pcpu_ptr, cpu) =  malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
 	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
 		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
 	/*
@@ -1589,6 +1589,15 @@ vmbus_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
+static void alloc_pcpu_ptr(struct vmbus_softc *sc)
+{
+	int cpu;
+
+	CPU_FOREACH(cpu){
+		VMBUS_PCPU_GET(sc, pcpu_ptr, cpu) =  malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
+	}
+}
+
 /**
  * @brief Main vmbus driver initialization routine.
  *
@@ -1610,6 +1619,8 @@ vmbus_doattach(struct vmbus_softc *sc)
 	device_t dev_res;
 	ACPI_HANDLE handle;
 	unsigned int coherent = 0;
+	
+	alloc_pcpu_ptr(sc);
 
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);
