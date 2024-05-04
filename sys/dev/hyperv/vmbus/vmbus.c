@@ -848,7 +848,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	uint64_t cr3;
 
 	flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
-//	printf("hv_vm_tlb_flush is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
+	printf("hv_vm_tlb_flush is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
         //CPU_ZERO(&flush.processor_mask);
 	flush->processor_mask = 0;
 //	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
@@ -858,6 +858,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 //	}
 
 	if (cr3 == PMAP_NO_CR3) {
+		printf("hv_vm_tlb_flush: if case cr3: %d\n",(cr3 == PMAP_NO_CR3));
         	flush->address_space = 0;
         	flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
@@ -866,16 +867,23 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 		flush->address_space &= ~CR3_PCID_MASK;
 		flush->flags = 0;
 	}
-        if(CPU_CMP(&mask, &all_cpus))
+	char buff[CPUSETBUFSIZ];
+	printf("hv_vm_tlb_flush: cpumask %s\n",cpusetobj_strprint(buff,&mask));
+	printf("hv_vm_tlb_flush: all_cpumask %s\n",cpusetobj_strprint(buff,&all_cpus));
+        if(CPU_CMP(&mask, &all_cpus) == 0){
                 flush->flags |= HV_FLUSH_ALL_PROCESSORS;
+		printf("hv_vm_tlb_flush: if case: %d\n",CPU_CMP(&mask, &all_cpus));
+	}
         else {
+		printf("hv_vm_tlb_flush: else case\n");
 		if (CPU_FLS(&mask)  < mp_ncpus && CPU_FLS(&mask) >= 64)
-			return 1;
+			goto do_ex_hypercall;
 
                 CPU_FOREACH_ISSET(cpu, &mask) {
 			vcpu = VMBUS_PCPU_GET(sc, vcpuid, cpu);
+			printf("hv_vm_tlb_flush: vcpu: %d\n",vcpu);
 			if (vcpu >= 64)
-				return 1;
+				goto do_ex_hypercall;
 
 			set_bit(vcpu, &flush->processor_mask);
 		}
@@ -884,17 +892,17 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	}
 	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);
 	if (addr2 == 0) {
-//		printf("pmap is TLB ALL\n");
+		printf("pmap is TLB ALL\n");
 		flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)flush,
 				(uint64_t)NULL);
 	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
-//		printf("greater than max_gvas\n");
+		printf("greater than max_gvas\n");
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)flush,
 					(uint64_t)NULL);
 	} else {
 	
-//		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush.address_space, addr1);
+		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush->address_space, addr1);
        		gva_n = fill_gva_list(flush->gva_list, 0,
                                       addr1, addr2);
 //		int c ;
@@ -907,8 +915,10 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 
 	}
 
-//	printf("the status is 0x%lx\n", status);
+	printf("the status is 0x%lx\n", status);
 	return status;		
+do_ex_hypercall:
+	return hv_flush_tlb_others_ex(pmap, addr1, addr2, mask);
 }
 #if 1
 #define HV_STATUS_INVALID_PARAMETER 5
@@ -929,7 +939,7 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
         flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
 	uint64_t status = 0;
 	uint64_t cr3;
-//	printf("hv_vm_tlb_flush is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
+	printf("hv_flush_tlb_others_ex is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
         //CPU_ZERO(&flush.processor_mask);
 	
 //	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
@@ -964,7 +974,7 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
 
         flush->hv_vp_set.format = HV_GENERIC_SET_SPARSE_4K;
         nr_bank = hv_cpumask_to_vpset(&flush->hv_vp_set, &mask, sc);
-                       
+        printf("hv_flush_tlb_others_ex: nr_bank: %d\n",nr_bank);
         if (nr_bank < 0)
                 return HV_STATUS_INVALID_PARAMETER;
 
@@ -996,7 +1006,8 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX,
                         gva_n, nr_bank, (uint64_t)flush, (uint64_t)NULL);
         }
-	printf("status is 0x%lx\n",status);
+	printf("VENNELA: hv_flush_tlb_others_ex: status 16bits is 0x%04X\n",(uint16_t)(status & 0xFFFF));
+	printf("VENNELA: hv_flush_tlb_others_ex: status is 0x%lx\n",status);
         return status;
 }
 #endif
