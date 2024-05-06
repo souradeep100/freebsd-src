@@ -606,7 +606,7 @@ static void
 smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
     smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
-	cpuset_t mask;
+	cpuset_t mask, tmp_mask;
 	uint32_t generation, *p_cpudone;
 	int cpu;
 	bool is_all;
@@ -625,6 +625,20 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	 * See if we have to interrupt other CPUs.
 	 */
 	CPU_COPY(pmap_invalidate_cpu_mask(pmap), &mask);
+	CPU_COPY(&mask, &tmp_mask);
+	critical_enter();
+#if 1
+	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
+		if(hv_vm_tlb_flush(pmap, addr1, addr2, tmp_mask) != 0) 
+			goto tlb_nopv;
+
+		goto hv_end;
+	}
+
+tlb_nopv:
+	critical_exit();
+#endif
+
 	is_all = CPU_CMP(&mask, &all_cpus) == 0;
 	CPU_CLR(curcpu, &mask);
 	if (CPU_EMPTY(&mask))
@@ -638,16 +652,6 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
-#if 1
-	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
-		if(hv_vm_tlb_flush(pmap, addr1, addr2, mask) != 0) 
-			goto tlb_nopv;
-
-		goto hv_end;
-	}
-
-tlb_nopv:
-#endif
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
 	PCPU_SET(smp_tlb_pmap, pmap);

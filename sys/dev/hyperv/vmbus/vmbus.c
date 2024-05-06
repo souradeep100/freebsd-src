@@ -840,17 +840,17 @@ static inline int fill_gva_list(uint64_t gva_list[], int offset,
 uint64_t
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask)
 {
-        struct hyperv_tlb_flush *flush;
+        struct hyperv_tlb_flush flush;
 	struct vmbus_softc *sc = vmbus_get_softc();
         int cpu, vcpu;
 	int max_gvas, gva_n;
 	uint64_t status = 0;
 	uint64_t cr3;
 
-	flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
+	//flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
 	printf("hv_vm_tlb_flush is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
         //CPU_ZERO(&flush.processor_mask);
-	flush->processor_mask = 0;
+	flush.processor_mask = 0;
 //	printf("addr1 0x%lx addr2 0x%lx \n", addr1, addr2);
 	cr3 = pmap->pm_cr3;
 //	if (pmap == kernel_pmap) {
@@ -859,19 +859,19 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 
 	if (cr3 == PMAP_NO_CR3) {
 		printf("hv_vm_tlb_flush: if case cr3: %d\n",(cr3 == PMAP_NO_CR3));
-        	flush->address_space = 0;
-        	flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+        	flush.address_space = 0;
+        	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
 
-		flush->address_space = cr3;
-		flush->address_space &= ~CR3_PCID_MASK;
-		flush->flags = 0;
+		flush.address_space = cr3;
+		flush.address_space &= ~CR3_PCID_MASK;
+		flush.flags = 0;
 	}
 	char buff[CPUSETBUFSIZ];
 	printf("hv_vm_tlb_flush: cpumask %s\n",cpusetobj_strprint(buff,&mask));
 	printf("hv_vm_tlb_flush: all_cpumask %s\n",cpusetobj_strprint(buff,&all_cpus));
         if(CPU_CMP(&mask, &all_cpus) == 0){
-                flush->flags |= HV_FLUSH_ALL_PROCESSORS;
+                flush.flags |= HV_FLUSH_ALL_PROCESSORS;
 		printf("hv_vm_tlb_flush: if case: %d\n",CPU_CMP(&mask, &all_cpus));
 	}
         else {
@@ -885,32 +885,32 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 			if (vcpu >= 64)
 				goto do_ex_hypercall;
 
-			set_bit(vcpu, &flush->processor_mask);
+			set_bit(vcpu, &flush.processor_mask);
 		}
-		if (! flush->processor_mask )
+		if (! flush.processor_mask )
 			return 1;
 	}
-	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);
+	max_gvas = (PAGE_SIZE - sizeof(flush)) / sizeof(flush.gva_list[0]);
 	if (addr2 == 0) {
 		printf("pmap is TLB ALL\n");
-		flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
-		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)flush,
+		flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 				(uint64_t)NULL);
 	} else if ((addr2 && (addr2 -addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
 		printf("greater than max_gvas\n");
-		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)flush,
+		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)&flush,
 					(uint64_t)NULL);
 	} else {
 	
-		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush->address_space, addr1);
-       		gva_n = fill_gva_list(flush->gva_list, 0,
+		printf("doing list flush cr3 0x%lx and addr1 0x%lx\n", flush.address_space, addr1);
+       		gva_n = fill_gva_list(flush.gva_list, 0,
                                       addr1, addr2);
 //		int c ;
 //		for (c = 0; c < gva_n; c++)
 //			printf("flush.gva_list[%d] 0x%lx\n", c, flush.gva_list[c]);
 
                	status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
-                                             gva_n, 0, (uint64_t)flush, (uint64_t)NULL);
+                                             gva_n, 0, (uint64_t)&flush, (uint64_t)NULL);
 //		printf("the status of list flush 0x%lx \n", status);
 
 	}
@@ -931,12 +931,12 @@ uint64_t
 hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const cpuset_t mask)
 {
         int nr_bank = 0, max_gvas, gva_n;
-        struct hv_tlb_flush_ex *flush;
+        struct hv_tlb_flush_ex flush;
 	struct vmbus_softc *sc = vmbus_get_softc();
        // if (!(ms_hyperv.hints & HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))
          //       return HV_STATUS_INVALID_PARAMETER;
 
-        flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
+        //flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
 	uint64_t status = 0;
 	uint64_t cr3;
 	printf("hv_flush_tlb_others_ex is called pmap cr3 0x%lx ucr3 0x%lx\n", pmap->pm_cr3, pmap->pm_ucr3);
@@ -949,13 +949,13 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
 //	}
 
 	if (cr3 == PMAP_NO_CR3) {
-        	flush->address_space = 0;
-        	flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+        	flush.address_space = 0;
+        	flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {
 
-		flush->address_space = cr3;
-		flush->address_space &= ~CR3_PCID_MASK;
-		flush->flags = 0;
+		flush.address_space = cr3;
+		flush.address_space &= ~CR3_PCID_MASK;
+		flush.flags = 0;
 	}
        // if (info->mm) {
        //         /*
@@ -963,17 +963,17 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
        //          * stripped out.
        //          */
        //         flush.address_space = 
-       //         flush->address_space &= CR3_ADDR_MASK;
-       //         flush->flags = 0;
+       //         flush.address_space &= CR3_ADDR_MASK;
+       //         flush.flags = 0;
        // } else {
-       //         flush->address_space = 0;
-       //         flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
+       //         flush.address_space = 0;
+       //         flush.flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
        // }
 
-        flush->hv_vp_set.valid_bank_mask = 0;
+        flush.hv_vp_set.valid_bank_mask = 0;
 
-        flush->hv_vp_set.format = HV_GENERIC_SET_SPARSE_4K;
-        nr_bank = hv_cpumask_to_vpset(&flush->hv_vp_set, &mask, sc);
+        flush.hv_vp_set.format = HV_GENERIC_SET_SPARSE_4K;
+        nr_bank = hv_cpumask_to_vpset(&flush.hv_vp_set, &mask, sc);
         printf("hv_flush_tlb_others_ex: nr_bank: %d\n",nr_bank);
         if (nr_bank < 0)
                 return HV_STATUS_INVALID_PARAMETER;
@@ -983,28 +983,28 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
          * whole address space if we were asked to do more.
          */
         max_gvas =
-                (PAGE_SIZE - sizeof(*flush) - nr_bank *
-                 sizeof(flush->hv_vp_set.bank_contents[0])) /
-                sizeof(flush->gva_list[0]);
+                (PAGE_SIZE - sizeof(flush) - nr_bank *
+                 sizeof(flush.hv_vp_set.bank_contents[0])) /
+                sizeof(flush.gva_list[0]);
 
         if (addr2 == 0) {
 		printf("pmap is TLB ALL\n");
-                flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
+                flush.flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
-                        0, nr_bank, (uint64_t)flush, (uint64_t)NULL);
+                        0, nr_bank, (uint64_t)&flush, (uint64_t)NULL);
         } else if (addr2 &&
                    ((addr2 - addr1)/HV_TLB_FLUSH_UNIT) > max_gvas) {
 		printf("greater than max_gvas\n");
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
-                        0, nr_bank, (uint64_t)flush, (uint64_t)NULL);
+                        0, nr_bank, (uint64_t)&flush, (uint64_t)NULL);
         } else {
-                gva_n = fill_gva_list(flush->gva_list, nr_bank,
+                gva_n = fill_gva_list(flush.gva_list, nr_bank,
                                       addr1, addr2);
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX,
-                        gva_n, nr_bank, (uint64_t)flush, (uint64_t)NULL);
+                        gva_n, nr_bank, (uint64_t)&flush, (uint64_t)NULL);
         }
 	printf("VENNELA: hv_flush_tlb_others_ex: status 16bits is 0x%04X\n",(uint16_t)(status & 0xFFFF));
 	printf("VENNELA: hv_flush_tlb_others_ex: status is 0x%lx\n",status);
