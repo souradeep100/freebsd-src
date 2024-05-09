@@ -143,6 +143,28 @@ struct vmbus_softc {
 
 #define VMBUS_PCPU_GET(sc, field, cpu)	(sc)->vmbus_pcpu[(cpu)].field
 #define VMBUS_PCPU_PTR(sc, field, cpu)	&(sc)->vmbus_pcpu[(cpu)].field
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE 0x0002
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX 0x0013
+#define HV_FLUSH_ALL_PROCESSORS BIT(0)
+#define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES BIT(1)
+#define HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY BIT(2)
+#define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
+
+
+#define BITS_PER_LONG                   (sizeof(long) * NBBY)
+#define BIT_MASK(nr)            (1UL << ((nr) & (BITS_PER_LONG - 1)))
+#define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
+#define set_bit(i, a)                                                   \
+	    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST 0x0003
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX 0x0014
+#define HYPERV_X64_EX_PROCESSOR_MASKS_RECOMMENDED    BIT(11)
+
+enum HV_GENERIC_SET_FORMAT {
+	HV_GENERIC_SET_SPARSE_4K,
+	HV_GENERIC_SET_ALL,
+};
 
 struct vmbus_channel;
 struct trapframe;
@@ -182,31 +204,32 @@ void    vmbus_synic_setup1(void *xsc);
 void    vmbus_synic_teardown1(void);
 int     vmbus_setup_intr1(struct vmbus_softc *sc);
 void    vmbus_intr_teardown1(struct vmbus_softc *sc);
+
+DPCPU_DECLARE(void *, hv_pcpu_mem);
+
 extern int hv_synic_done;
 extern uint32_t hv_max_vp_index;
 
-struct hyperv_tlb_flush {
-        uint64_t address_space;
-        uint64_t flags;
-        uint64_t processor_mask;
-        uint64_t gva_list[];
-}__packed;
+enum invl_op_codes {
+	INVL_OP_TLB               = 1,
+	INVL_OP_TLB_INVPCID       = 2,
+	INVL_OP_TLB_INVPCID_PTI   = 3,
+	INVL_OP_TLB_PCID          = 4,
+	INVL_OP_PGRNG             = 5,
+	INVL_OP_PGRNG_INVPCID     = 6,
+	INVL_OP_PGRNG_PCID        = 7,
+	INVL_OP_PG                = 8,
+	INVL_OP_PG_INVPCID        = 9,
+	INVL_OP_PG_PCID           = 10,
+	INVL_OP_CACHE             = 11,
+};
 
-struct hv_vpset {
-        uint64_t format;
-        uint64_t valid_bank_mask;
-        uint64_t bank_contents[];
-} __packed;
-
-struct hv_tlb_flush_ex {
-        uint64_t address_space;
-        uint64_t flags;
-        struct hv_vpset hv_vp_set;
-        uint64_t gva_list[];
-} __packed;
+uint64_t        hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1,
+		                vm_offset_t addr2, cpuset_t mask, enum invl_op_codes op);
+uint64_t	hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1,
+		                vm_offset_t addr2, cpuset_t mask, enum invl_op_codes op, struct vmbus_softc *sc);
 
 uint64_t        hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
-		                vm_offset_t addr2, cpuset_t mask);
-uint64_t	hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1,
-		                vm_offset_t addr2, cpuset_t mask);
+		                vm_offset_t addr2, cpuset_t mask, enum invl_op_codes op,
+			       	struct vmbus_softc *sc);
 #endif	/* !_VMBUS_VAR_H_ */

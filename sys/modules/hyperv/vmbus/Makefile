@@ -19,7 +19,7 @@ CWARNEXTRA+=   -Wno-gnu-variable-sized-type-not-at-end
 SRCS+=	vmbus_vector.S
 .endif
 .if ${MACHINE_CPUARCH} != "aarch64"
-SRCS+= vmbus_et.c hyperv_x86.c vmbus_x86.c
+SRCS+= vmbus_et.c hyperv_x86.c vmbus_x86.c hyperv_mmu.c
 .else
 SRC+= hyperv_aarch64.c vmbus_aarch64.c
 .endif
@@ -32,7 +32,6 @@ SRCS+=	opt_apic.h
 .endif
 
 DPSRCS=	assym.inc
-
 vmbus_vector.o:
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \
             ${.IMPSRC} -o ${.TARGET}

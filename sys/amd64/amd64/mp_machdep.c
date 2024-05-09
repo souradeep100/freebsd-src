@@ -503,6 +503,7 @@ start_ap(int apic_id, vm_paddr_t boot_address)
  * Invalidation request.  PCPU pc_smp_tlb_op uses u_int instead of the
  * enum to avoid both namespace and ABI issues (with enums).
  */
+/*
 enum invl_op_codes {
       INVL_OP_TLB		= 1,
       INVL_OP_TLB_INVPCID	= 2,
@@ -515,7 +516,7 @@ enum invl_op_codes {
       INVL_OP_PG_INVPCID	= 9,
       INVL_OP_PG_PCID		= 10,
       INVL_OP_CACHE		= 11,
-};
+};*/
 
 /*
  * These variables are initialized at startup to reflect how each of
@@ -639,16 +640,14 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
-#if 1
 	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
-		if(hv_vm_tlb_flush(pmap, addr1, addr2, tmp_mask) != 0) 
+		if(hv_vm_tlb_flush_dummy(pmap, addr1, addr2, tmp_mask, op) != 0) 
 			goto tlb_nopv;
 
 		goto hv_end;
 	}
 
 tlb_nopv:
-#endif
 
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
