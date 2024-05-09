@@ -170,5 +170,19 @@ void		 pmap_zero_page_area(vm_page_t, int off, int size);
 #define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)
 #define	pmap_wired_count(pm)	((pm)->pm_stats.wired_count)
 
+enum invl_op_codes {
+	INVL_OP_TLB               = 1,
+	INVL_OP_TLB_INVPCID       = 2,
+	INVL_OP_TLB_INVPCID_PTI   = 3,
+	INVL_OP_TLB_PCID          = 4,
+	INVL_OP_PGRNG             = 5,
+	INVL_OP_PGRNG_INVPCID     = 6,
+	INVL_OP_PGRNG_PCID        = 7,
+	INVL_OP_PG                = 8,
+	INVL_OP_PG_INVPCID        = 9,
+	INVL_OP_PG_PCID           = 10,
+	INVL_OP_CACHE             = 11,
+};
+
 #endif /* _KERNEL */
 #endif /* _PMAP_VM_ */
