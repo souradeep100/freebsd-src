@@ -1406,6 +1406,14 @@ static void alloc_pcpu_ptr(void)
 	}
 }
 
+static void free_pcpu_ptr(void)
+{
+	int cpu;
+	CPU_FOREACH(cpu){
+		free(*DPCPU_ID_PTR(cpu, hv_pcpu_mem), M_DEVBUF);
+	}
+}
+
 /**
  * @brief Main vmbus driver initialization routine.
  *
@@ -1539,6 +1547,7 @@ cleanup:
 		sc->vmbus_xc = NULL;
 	}
 	free(__DEVOLATILE(void *, sc->vmbus_chmap), M_DEVBUF);
+	free_pcpu_ptr();
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
@@ -1617,6 +1626,7 @@ vmbus_detach(device_t dev)
 	}
 
 	free(__DEVOLATILE(void *, sc->vmbus_chmap), M_DEVBUF);
+	free_pcpu_ptr();
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 

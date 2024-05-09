@@ -113,6 +113,8 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	int max_gvas, gva_n;
 	uint64_t status = 0;
 	uint64_t cr3;
+	if(*DPCPU_PTR(hv_pcpu_mem) == NULL)
+		return EINVAL;
 	flush = *DPCPU_PTR(hv_pcpu_mem);
 
 	//flush = VMBUS_PCPU_GET(sc, pcpu_ptr, curcpu);
@@ -193,6 +195,8 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
 {
         int nr_bank = 0, max_gvas, gva_n;
         struct hv_tlb_flush_ex *flush;
+	if(*DPCPU_PTR(hv_pcpu_mem) == NULL)
+		return EINVAL;
 	flush = *DPCPU_PTR(hv_pcpu_mem);
 	if (!(hyperv_recommends & HYPERV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))
                return EINVAL;
