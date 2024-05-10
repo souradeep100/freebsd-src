@@ -74,7 +74,6 @@
 #include "vmbus_if.h"
 
 #define VMBUS_GPADL_START		0xe1e10
-#define BIT(n)                  (1ULL << (n))
 
 struct vmbus_msghc {
 	struct vmbus_xact		*mh_xact;

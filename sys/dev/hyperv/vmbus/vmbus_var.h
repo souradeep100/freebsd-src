@@ -151,14 +151,17 @@ struct vmbus_softc {
 #define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
 
 
-#define BITS_PER_LONG                   (sizeof(long) * NBBY)
+#define BIT(n)                  (1ULL << (n))
+#define BITS_PER_LONG           (sizeof(long) * NBBY)
 #define BIT_MASK(nr)            (1UL << ((nr) & (BITS_PER_LONG - 1)))
 #define BIT_WORD(nr)            ((nr) / BITS_PER_LONG)
 #define set_bit(i, a)                                                   \
 	    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
-#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST 0x0003
-#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX 0x0014
+#define GENMASK_ULL(h, l)  (((~0ULL) >> (64 - (h) - 1)) & ((~0ULL) << (l)))
+
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST 	0x0003
+#define HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX 	0x0014
 #define HYPERV_X64_EX_PROCESSOR_MASKS_RECOMMENDED    BIT(11)
 
 enum HV_GENERIC_SET_FORMAT {
@@ -213,10 +216,12 @@ extern uint32_t hv_max_vp_index;
 
 uint64_t        hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1,
 		                vm_offset_t addr2, cpuset_t mask, enum invl_op_codes op);
+#if defined(__x86_64__)
 uint64_t	hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1,
 		                vm_offset_t addr2, cpuset_t mask, enum invl_op_codes op, struct vmbus_softc *sc);
 
 uint64_t        hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1,
 		                vm_offset_t addr2, cpuset_t mask, enum invl_op_codes op,
 			       	struct vmbus_softc *sc);
+#endif
 #endif	/* !_VMBUS_VAR_H_ */

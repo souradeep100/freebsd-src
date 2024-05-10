@@ -1,5 +1,13 @@
+
 #ifndef _HYPERV_MMU_H_
 #define _HYPERV_MMU_H_
+
+#include "vmbus_var.h"
+
+#define HV_VCPUS_PER_SPARSE_BANK (64)
+#define HV_MAX_SPARSE_VCPU_BANKS (64)
+
+#define GENMASK_ULL(h, l)  (((~0ULL) >> (64 - (h) - 1)) & ((~0ULL) << (l)))
 
 struct hyperv_tlb_flush {
 	uint64_t address_space;
