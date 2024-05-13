@@ -13,12 +13,13 @@ SRCS=	hyperv.c \
 	vmbus_if.c \
 	vmbus_res.c \
 	vmbus_xact.c
+CWARNEXTRA+=   -Wno-gnu-variable-sized-type-not-at-end
 
 .if ${MACHINE_CPUARCH} != "i386" && ${MACHINE_CPUARCH} != "aarch64"
 SRCS+=	vmbus_vector.S
 .endif
 .if ${MACHINE_CPUARCH} != "aarch64"
-SRCS+= vmbus_et.c hyperv_x86.c vmbus_x86.c
+SRCS+= vmbus_et.c hyperv_x86.c vmbus_x86.c hyperv_mmu.c
 .else
 SRC+= hyperv_aarch64.c vmbus_aarch64.c
 .endif

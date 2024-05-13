@@ -75,6 +75,8 @@
 #include <machine/cpu.h>
 #include <x86/init.h>
 
+#include <dev/hyperv/vmbus/hyperv_var.h>
+#include <dev/hyperv/vmbus/vmbus_var.h>
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
@@ -102,7 +104,7 @@ void *bootpcpu;
 
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
-
+extern int hv_synic_done;
 /*
  * Local data and functions.
  */
@@ -498,24 +500,6 @@ start_ap(int apic_id, vm_paddr_t boot_address)
  */
 
 /*
- * Invalidation request.  PCPU pc_smp_tlb_op uses u_int instead of the
- * enum to avoid both namespace and ABI issues (with enums).
- */
-enum invl_op_codes {
-      INVL_OP_TLB		= 1,
-      INVL_OP_TLB_INVPCID	= 2,
-      INVL_OP_TLB_INVPCID_PTI	= 3,
-      INVL_OP_TLB_PCID		= 4,
-      INVL_OP_PGRNG		= 5,
-      INVL_OP_PGRNG_INVPCID	= 6,
-      INVL_OP_PGRNG_PCID	= 7,
-      INVL_OP_PG		= 8,
-      INVL_OP_PG_INVPCID	= 9,
-      INVL_OP_PG_PCID		= 10,
-      INVL_OP_CACHE		= 11,
-};
-
-/*
  * These variables are initialized at startup to reflect how each of
  * the different kinds of invalidations should be performed on the
  * current machine and environment.
@@ -604,7 +588,7 @@ static void
 smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
     smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
-	cpuset_t mask;
+	cpuset_t mask, pv_cpu_mask;
 	uint32_t generation, *p_cpudone;
 	int cpu;
 	bool is_all;
@@ -623,6 +607,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	 * See if we have to interrupt other CPUs.
 	 */
 	CPU_COPY(pmap_invalidate_cpu_mask(pmap), &mask);
+	CPU_COPY(&mask, &pv_cpu_mask);
 	is_all = CPU_CMP(&mask, &all_cpus) == 0;
 	CPU_CLR(curcpu, &mask);
 	if (CPU_EMPTY(&mask))
@@ -638,6 +623,14 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
+	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
+		if(hv_vm_tlb_flush_dummy(pmap, addr1, addr2, pv_cpu_mask, op) != 0)
+			goto tlb_nopv;
+
+		goto hv_end;
+	}
+
+tlb_nopv:
 
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
@@ -679,6 +672,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	 * preemption, this allows scheduler to select thread on any
 	 * CPU from its cpuset.
 	 */
+hv_end:
 	sched_unpin();
 	critical_exit();
 

@@ -44,10 +44,6 @@
 #include <sys/systm.h>
 #include <sys/taskqueue.h>
 
-#include <vm/vm.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
 
 #include <machine/bus.h>
 #if defined(__aarch64__)
@@ -207,6 +203,10 @@ static driver_t vmbus_driver = {
 	vmbus_methods,
 	sizeof(struct vmbus_softc)
 };
+
+int hv_synic_done = 0;
+uint32_t hv_max_vp_index;
+DPCPU_DEFINE(void *, hv_pcpu_mem);
 
 DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
 DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
@@ -748,6 +748,8 @@ vmbus_synic_setup(void *xsc)
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
 	}
 
+	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
+		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
 	/*
 	 * Setup the SynIC message.
 	 */
@@ -784,7 +786,26 @@ vmbus_synic_setup(void *xsc)
 	orig = RDMSR(MSR_HV_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(MSR_HV_SCONTROL, val);
+	hv_synic_done = 1;
 }
+
+#if defined(__x86_64__)
+uint64_t
+hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+			cpuset_t mask, enum invl_op_codes op)
+{
+	struct vmbus_softc *sc = vmbus_get_softc();
+	return(hv_vm_tlb_flush(pmap, addr1, addr2, mask, op, sc));
+}
+#else
+
+uint64_t
+hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+			cpuset_t mask, enum invl_op_codes op)
+{
+	return EINVAL;
+}
+#endif /*__x86_64__*/
 
 static void
 vmbus_synic_teardown(void *arg)
@@ -1373,6 +1394,27 @@ vmbus_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
+static void alloc_pcpu_ptr(void)
+{
+	int cpu;
+	void **hv_cpu_mem;
+	CPU_FOREACH(cpu){
+		  hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
+		  *hv_cpu_mem = malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
+	}
+}
+
+static void free_pcpu_ptr(void)
+{
+	int cpu;
+	void **hv_cpu_mem;
+	CPU_FOREACH(cpu){
+		hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem);
+		if(*hv_cpu_mem)
+			free(*hv_cpu_mem, M_DEVBUF);
+	}
+}
+
 /**
  * @brief Main vmbus driver initialization routine.
  *
@@ -1394,6 +1436,8 @@ vmbus_doattach(struct vmbus_softc *sc)
 	device_t dev_res;
 	ACPI_HANDLE handle;
 	unsigned int coherent = 0;
+	
+	alloc_pcpu_ptr();
 
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);
@@ -1504,6 +1548,7 @@ cleanup:
 		sc->vmbus_xc = NULL;
 	}
 	free(__DEVOLATILE(void *, sc->vmbus_chmap), M_DEVBUF);
+	free_pcpu_ptr();
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
@@ -1582,6 +1627,7 @@ vmbus_detach(device_t dev)
 	}
 
 	free(__DEVOLATILE(void *, sc->vmbus_chmap), M_DEVBUF);
+	free_pcpu_ptr();
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 

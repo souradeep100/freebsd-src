@@ -145,6 +145,8 @@ dev/hyperv/vmbus/vmbus_et.c				optional	hyperv
 dev/hyperv/vmbus/vmbus_if.m				optional	hyperv
 dev/hyperv/vmbus/vmbus_res.c				optional	hyperv
 dev/hyperv/vmbus/vmbus_xact.c				optional	hyperv
+dev/hyperv/vmbus/hyperv_mmu.c				optional	hyperv \
+	compile-with "${NORMAL_C} ${NO_WNO_GNU_VARIABLE_SIZED_TYPE_NOT_AT_END}"
 dev/ichwd/ichwd.c		optional	ichwd
 dev/imcsmb/imcsmb.c		optional	imcsmb
 dev/imcsmb/imcsmb_pci.c		optional	imcsmb pci
