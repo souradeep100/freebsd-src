@@ -22,10 +22,10 @@
 #include <dev/hyperv/vmbus/hyperv_common_reg.h>
 #include "hyperv_mmu.h"
 
-static inline int fill_gva_list(uint64_t gva_list[], int offset,
+static inline int fill_gva_list(uint64_t gva_list[],
                                 unsigned long start, unsigned long end)
 {
-        int gva_n = offset;
+        int gva_n = 0;
         unsigned long cur = start, diff;
 
         do {
@@ -48,7 +48,7 @@ static inline int fill_gva_list(uint64_t gva_list[], int offset,
 
         } while (cur < end);
 
-        return gva_n - offset;
+        return gva_n;
 }
 
 
@@ -142,7 +142,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 					(uint64_t)NULL);
 	} else {
 	
-       		gva_n = fill_gva_list(flush->gva_list, 0,
+       		gva_n = fill_gva_list(flush->gva_list,
                                       addr1, addr2);
 
                	status = hv_do_rep_hypercall(HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST,
@@ -193,7 +193,7 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
         max_gvas =
                 (PAGE_SIZE - sizeof(*flush) - nr_bank *
                  sizeof(flush->hv_vp_set.bank_contents[0])) /
-                sizeof(flush->gva_list[0]);
+                sizeof(flush->hv_vp_set.bank_contents[0]);
 
 	if (op == INVL_OP_PG) {
                 flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
@@ -206,7 +206,7 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,
                         0, nr_bank, (uint64_t)flush, (uint64_t)NULL);
         } else {
-                gva_n = fill_gva_list(flush->gva_list, nr_bank,
+                gva_n = fill_gva_list(&flush->hv_vp_set.bank_contents[nr_bank],
                                       addr1, addr2);
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_LIST_EX,

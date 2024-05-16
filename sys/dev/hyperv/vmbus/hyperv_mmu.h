@@ -26,7 +26,7 @@ struct hv_tlb_flush_ex {
 	uint64_t address_space;
 	uint64_t flags;
 	struct hv_vpset hv_vp_set;
-	uint64_t gva_list[];
+	//uint64_t gva_list[];
 } __packed;
 
 #endif
