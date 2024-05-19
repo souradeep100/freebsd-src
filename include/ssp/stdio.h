@@ -48,42 +48,36 @@ int __snprintf_chk(char *__restrict, size_t, int, size_t,
 int __vsnprintf_chk(char *__restrict, size_t, int, size_t,
      const char *__restrict, __va_list)
     __printflike(5, 0);
-char *__gets_chk(char *, size_t);
 char *__fgets_chk(char *, int, size_t, FILE *);
 __END_DECLS
 
 #if __SSP_FORTIFY_LEVEL > 0
 
-#define sprintf(str, ...) ({	\
+#define sprintf(str, ...) __extension__ ({	\
     char *_ssp_str = (str);	\
     __builtin___sprintf_chk(_ssp_str, 0, __ssp_bos(_ssp_str),		\
         __VA_ARGS__); \
 })
 
-#define vsprintf(str, fmt, ap) ({	\
+#define vsprintf(str, fmt, ap) __extension__ ({	\
     char *_ssp_str = (str);		\
     __builtin___vsprintf_chk(_ssp_str, 0, __ssp_bos(_ssp_str), fmt,	\
         ap);				\
 })
 
-#define snprintf(str, len, ...) ({	\
+#define snprintf(str, len, ...) __extension__ ({	\
     char *_ssp_str = (str);		\
     __builtin___snprintf_chk(_ssp_str, len, 0, __ssp_bos(_ssp_str),	\
         __VA_ARGS__);			\
 })
 
-#define vsnprintf(str, len, fmt, ap) ({	\
+#define vsnprintf(str, len, fmt, ap) __extension__ ({	\
     char *_ssp_str = (str);		\
     __builtin___vsnprintf_chk(_ssp_str, len, 0, __ssp_bos(_ssp_str),	\
         fmt, ap);			\
 })
 
-#define gets(str) ({			\
-   char *_ssp_str = (str);		\
-    __gets_chk(_ssp_str, __ssp_bos(_ssp_str));	\
-})
-
-#define fgets(str, len, fp) ({		\
+#define fgets(str, len, fp) __extension__ ({		\
     char *_ssp_str = (str);		\
     __fgets_chk(_ssp_str, len, __ssp_bos(_ssp_str), fp);	\
 })
