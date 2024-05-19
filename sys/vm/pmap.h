@@ -86,11 +86,12 @@ typedef struct pmap_statistics *pmap_statistics_t;
  * void		pmap_page_set_memattr(vm_page_t, vm_memattr_t);
  */
 #include <machine/pmap.h>
+//#include <x86/x86_smp.h>
 
 #ifdef _KERNEL
 #include <sys/_cpuset.h>
-struct thread;
 
+struct thread;
 /*
  * Updates to kernel_vm_end are synchronized by the kernel_map's system mutex.
  */
@@ -105,6 +106,7 @@ extern vm_offset_t kernel_vm_end;
 #define	PMAP_ENTER_WIRED	0x00000200
 #define	PMAP_ENTER_LARGEPAGE	0x00000400
 #define	PMAP_ENTER_RESERVED	0xFF000000
+
 
 /*
  * Define the maximum number of machine-dependent reference bits that are
@@ -167,9 +169,6 @@ void		 pmap_unwire(pmap_t pmap, vm_offset_t start, vm_offset_t end);
 void		 pmap_zero_page(vm_page_t);
 void		 pmap_zero_page_area(vm_page_t, int off, int size);
 
-#define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)
-#define	pmap_wired_count(pm)	((pm)->pm_stats.wired_count)
-
 /*
  * Invalidation request.  PCPU pc_smp_tlb_op uses u_int instead of the
  * enum to avoid both namespace and ABI issues (with enums).
@@ -187,6 +186,9 @@ enum invl_op_codes {
 	INVL_OP_PG_PCID           = 10,
 	INVL_OP_CACHE             = 11,
 };
+
+#define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)
+#define	pmap_wired_count(pm)	((pm)->pm_stats.wired_count)
 
 #endif /* _KERNEL */
 #endif /* _PMAP_VM_ */

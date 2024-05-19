@@ -794,8 +794,11 @@ uint64_t
 hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 			cpuset_t mask, enum invl_op_codes op)
 {
-	struct vmbus_softc *sc = vmbus_get_softc();
-	return(hv_vm_tlb_flush(pmap, addr1, addr2, mask, op, sc));
+	if (hv_synic_done) {
+		struct vmbus_softc *sc = vmbus_get_softc();
+		return(hv_vm_tlb_flush(pmap, addr1, addr2, mask, op, sc));
+	}
+	return EINVAL;
 }
 #else
 

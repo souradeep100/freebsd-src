@@ -75,7 +75,6 @@
 #include <machine/cpu.h>
 #include <x86/init.h>
 
-#include <dev/hyperv/vmbus/hyperv_var.h>
 #include <dev/hyperv/vmbus/vmbus_var.h>
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
@@ -105,12 +104,17 @@ void *bootpcpu;
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
 extern int hv_synic_done;
+void (*smp_targeted_tlb_shootdown)(pmap_t, vm_offset_t, vm_offset_t,
+    smp_invl_cb_t, enum invl_op_codes);
 /*
  * Local data and functions.
  */
 
 static int start_ap(int apic_id, vm_paddr_t boot_address);
 
+static void
+smp_targeted_tlb_shootdown_legacy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+    smp_invl_cb_t curcpu_cb, enum invl_op_codes op);
 /*
  * Initialize the IPI handlers and start up the AP's.
  */
@@ -166,9 +170,10 @@ cpu_mp_start(void)
 	MPASS(kernel_pmap->pm_cr3 < (1UL << 32));
 	mptramp_pagetables = kernel_pmap->pm_cr3;
 
+	smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_legacy;
+
 	/* Start each Application Processor */
 	start_all_aps();
-
 	set_interrupt_apic_ids();
 
 #if defined(DEV_ACPI) && MAXMEMDOM > 1
@@ -585,10 +590,10 @@ invl_scoreboard_slot(u_int cpu)
  * completion.
  */
 static void
-smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+smp_targeted_tlb_shootdown_legacy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
     smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
-	cpuset_t mask, pv_cpu_mask;
+	cpuset_t mask;
 	uint32_t generation, *p_cpudone;
 	int cpu;
 	bool is_all;
@@ -607,7 +612,6 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	 * See if we have to interrupt other CPUs.
 	 */
 	CPU_COPY(pmap_invalidate_cpu_mask(pmap), &mask);
-	CPU_COPY(&mask, &pv_cpu_mask);
 	is_all = CPU_CMP(&mask, &all_cpus) == 0;
 	CPU_CLR(curcpu, &mask);
 	if (CPU_EMPTY(&mask))
@@ -623,15 +627,7 @@ smp_targeted_tlb_shootdown(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
-	if (vm_guest == VM_GUEST_HV && hv_synic_done) {
-		if(hv_vm_tlb_flush_dummy(pmap, addr1, addr2, pv_cpu_mask, op) != 0)
-			goto tlb_nopv;
-
-		goto hv_end;
-	}
-
-tlb_nopv:
-
+	
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
 	PCPU_SET(smp_tlb_pmap, pmap);
@@ -672,7 +668,6 @@ tlb_nopv:
 	 * preemption, this allows scheduler to select thread on any
 	 * CPU from its cpuset.
 	 */
-hv_end:
 	sched_unpin();
 	critical_exit();
 
