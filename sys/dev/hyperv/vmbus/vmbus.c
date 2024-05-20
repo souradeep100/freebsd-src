@@ -738,6 +738,7 @@ vmbus_synic_setup(void *xsc)
 	int cpu = curcpu;
 	uint64_t val, orig;
 	uint32_t sint;
+	void **hv_cpu_mem;
 
 	if (hyperv_features & CPUID_HV_MSR_VP_INDEX) {
 		/* Save virtual processor id. */
@@ -747,6 +748,9 @@ vmbus_synic_setup(void *xsc)
 		VMBUS_PCPU_GET(sc, vcpuid, cpu) = 0;
 	}
 
+	hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
+	*hv_cpu_mem = contigmalloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO,
+				0ul, ~0ul, PAGE_SIZE, 0);
 
 //	VMBUS_PCPU_GET(sc, pcpu_ptr, cpu) =  malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
 	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
@@ -1395,16 +1399,6 @@ vmbus_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
-static void alloc_pcpu_ptr(void)
-{
-	int cpu;
-	void **hv_cpu_mem;
-	CPU_FOREACH(cpu){
-		  hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
-		  *hv_cpu_mem = malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
-	}
-}
-
 /**
  * @brief Main vmbus driver initialization routine.
  *
@@ -1426,8 +1420,6 @@ vmbus_doattach(struct vmbus_softc *sc)
 	device_t dev_res;
 	ACPI_HANDLE handle;
 	unsigned int coherent = 0;
-	
-	alloc_pcpu_ptr();
 
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);

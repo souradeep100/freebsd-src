@@ -101,7 +101,13 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 	int max_gvas, gva_n;
 	uint64_t status = 0;
 	uint64_t cr3;
-	flush = *DPCPU_PTR(hv_pcpu_mem);
+	cpu = curcpu;
+	flush = *DPCPU_ID_PTR(cpu, hv_pcpu_mem);
+	if (op != INVL_OP_TLB && op != INVL_OP_PG && op != INVL_OP_PGRNG)
+		return EINVAL;
+
+	if (flush == NULL)
+		return EINVAL;
 
 	flush->processor_mask = 0;
 	cr3 = pmap->pm_cr3;
@@ -161,10 +167,12 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
 {
         int nr_bank = 0, max_gvas, gva_n;
         struct hv_tlb_flush_ex *flush;
-	flush = *DPCPU_PTR(hv_pcpu_mem);
+	int cpu = curcpu;
+	flush = *DPCPU_ID_PTR(cpu, hv_pcpu_mem);
 	uint64_t status = 0;
 	uint64_t cr3;
-	
+	if (flush == NULL)
+		return EINVAL;
 	if (!(hyperv_recommends & HYPERV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))
                return EINVAL;
 
