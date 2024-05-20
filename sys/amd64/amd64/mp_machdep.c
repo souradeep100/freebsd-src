@@ -168,7 +168,6 @@ cpu_mp_start(void)
 	MPASS(kernel_pmap->pm_cr3 < (1UL << 32));
 	mptramp_pagetables = kernel_pmap->pm_cr3;
 
-	smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_legacy;
 
 	/* Start each Application Processor */
 	start_all_aps();

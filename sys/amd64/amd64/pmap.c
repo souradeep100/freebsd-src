@@ -4528,6 +4528,7 @@ pmap_pinit_type(pmap_t pmap, enum pmap_type pm_type, int flags)
 	TAILQ_INIT(&pmap->pm_pvchunk);
 	pmap->pm_flags = flags;
 	pmap->pm_eptgen = 0;
+	smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_legacy;
 
 	return (1);
 }
