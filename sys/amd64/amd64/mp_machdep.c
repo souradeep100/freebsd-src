@@ -75,7 +75,6 @@
 #include <machine/cpu.h>
 #include <x86/init.h>
 
-#include <dev/hyperv/vmbus/vmbus_var.h>
 #ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
@@ -103,7 +102,6 @@ void *bootpcpu;
 
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
-extern int hv_synic_done;
 void (*smp_targeted_tlb_shootdown)(pmap_t, vm_offset_t, vm_offset_t,
     smp_invl_cb_t, enum invl_op_codes);
 /*
@@ -112,7 +110,7 @@ void (*smp_targeted_tlb_shootdown)(pmap_t, vm_offset_t, vm_offset_t,
 
 static int start_ap(int apic_id, vm_paddr_t boot_address);
 
-static void
+void
 smp_targeted_tlb_shootdown_legacy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
     smp_invl_cb_t curcpu_cb, enum invl_op_codes op);
 /*
@@ -174,6 +172,7 @@ cpu_mp_start(void)
 
 	/* Start each Application Processor */
 	start_all_aps();
+
 	set_interrupt_apic_ids();
 
 #if defined(DEV_ACPI) && MAXMEMDOM > 1
@@ -589,7 +588,7 @@ invl_scoreboard_slot(u_int cpu)
  * Function must be called with the thread pinned, and it unpins on
  * completion.
  */
-static void
+void
 smp_targeted_tlb_shootdown_legacy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
     smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
@@ -627,7 +626,7 @@ smp_targeted_tlb_shootdown_legacy(pmap_t pmap, vm_offset_t addr1, vm_offset_t ad
 	KASSERT((read_rflags() & PSL_I) != 0,
 	    ("smp_targeted_tlb_shootdown: interrupts disabled"));
 	critical_enter();
-	
+
 	PCPU_SET(smp_tlb_addr1, addr1);
 	PCPU_SET(smp_tlb_addr2, addr2);
 	PCPU_SET(smp_tlb_pmap, pmap);

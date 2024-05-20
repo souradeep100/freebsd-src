@@ -16,7 +16,6 @@ CWARNFLAGS?=	-Wall -Wstrict-prototypes \
 # kernel where fixing them is more trouble than it is worth, or where there is
 # a false positive.
 #
-NO_WNO_GNU_VARIABLE_SIZED_TYPE_NOT_AT_END= -Wno-gnu-variable-sized-type-not-at-end
 .if ${COMPILER_TYPE} == "clang"
 NO_WCONSTANT_CONVERSION=	-Wno-error=constant-conversion
 NO_WSHIFT_COUNT_NEGATIVE=	-Wno-shift-count-negative

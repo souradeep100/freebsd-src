@@ -38,7 +38,11 @@
 #include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
-
+#include <sys/proc.h>
+#include <sys/sched.h>
+#include <sys/kdb.h>
+#include <vm/vm.h>
+#include <vm/pmap.h>
 
 #include <machine/bus.h>
 #include <dev/hyperv/vmbus/x86/hyperv_machdep.h>
@@ -120,20 +124,54 @@ inline int hv_cpumask_to_vpset(struct hv_vpset *vpset,
 
 
 
-uint64_t
-hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask,
-		enum invl_op_codes op, struct vmbus_softc *sc)
+void
+hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+		enum invl_op_codes op, struct vmbus_softc *sc, smp_invl_cb_t curcpu_cb)
 {
+	cpuset_t tmp_mask, mask;
 	struct hyperv_tlb_flush *flush;
 	int cpu, vcpu;
 	int max_gvas, gva_n;
 	uint64_t status = 0;
 	uint64_t cr3;
+
+	if (!hv_synic_done)
+		return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
+
+        /*
+         * It is not necessary to signal other CPUs while booting or
+         * when in the debugger.
+         */
+        if (__predict_false(kdb_active || KERNEL_PANICKED() || !smp_started))
+                goto local_cb;
+
+        KASSERT(curthread->td_pinned > 0, ("curthread not pinned"));
+
+        /*
+         * Make a stable copy of the set of CPUs on which the pmap is active.
+         * See if we have to interrupt other CPUs.
+         */
+        CPU_COPY(pmap_invalidate_cpu_mask(pmap), &tmp_mask);
+	CPU_COPY(pmap_invalidate_cpu_mask(pmap), &mask);
+        CPU_CLR(curcpu, &tmp_mask);
+        if (CPU_EMPTY(&tmp_mask))
+                goto local_cb;
+
+        /*
+         * Initiator must have interrupts enabled, which prevents
+         * non-invalidation IPIs that take smp_ipi_mtx spinlock,
+         * from deadlocking with us.  On the other hand, preemption
+         * must be disabled to pin initiator to the instance of the
+         * pcpu pc_smp_tlb data and scoreboard line.
+         */
+        KASSERT((read_rflags() & PSL_I) != 0,
+            ("hv_tlb_flush: interrupts disabled"));
+        critical_enter();
+
 	if(*DPCPU_PTR(hv_pcpu_mem) == NULL)
-		return EINVAL;
+		goto legacy;
+
 	flush = *DPCPU_PTR(hv_pcpu_mem);
-	if (flush==NULL)
-		return ENOMEM;
 
 	flush->processor_mask = 0;
 	cr3 = pmap->pm_cr3;
@@ -162,7 +200,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 			set_bit(vcpu, &flush->processor_mask);
 		}
 		if (! flush->processor_mask )
-			return 1;
+			goto legacy;
 	}
 	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);
 	if (op == INVL_OP_PG) {
@@ -182,9 +220,29 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, cpuset_t mask
 
 	}
 	printf("the status of tlb_flush %lu\n", status);
-	return status;		
+	if(status)
+		goto legacy;
+	sched_unpin();
+	critical_exit();
+	return;
+
+local_cb:
+	critical_enter();
+	curcpu_cb(pmap, addr1, addr2);
+	sched_unpin();
+	critical_exit();
+	return;
 do_ex_hypercall:
-	return hv_flush_tlb_others_ex(pmap, addr1, addr2, mask, op, sc);
+	status = hv_flush_tlb_others_ex(pmap, addr1, addr2, mask, op, sc);
+	if (status)
+		goto legacy;
+	sched_unpin();
+	critical_exit();
+	return;
+legacy:
+	sched_unpin();
+	critical_exit();
+	return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
 }
 
 uint64_t

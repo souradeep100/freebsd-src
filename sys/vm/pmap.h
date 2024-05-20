@@ -86,12 +86,11 @@ typedef struct pmap_statistics *pmap_statistics_t;
  * void		pmap_page_set_memattr(vm_page_t, vm_memattr_t);
  */
 #include <machine/pmap.h>
-//#include <x86/x86_smp.h>
 
 #ifdef _KERNEL
 #include <sys/_cpuset.h>
-
 struct thread;
+
 /*
  * Updates to kernel_vm_end are synchronized by the kernel_map's system mutex.
  */
@@ -106,7 +105,6 @@ extern vm_offset_t kernel_vm_end;
 #define	PMAP_ENTER_WIRED	0x00000200
 #define	PMAP_ENTER_LARGEPAGE	0x00000400
 #define	PMAP_ENTER_RESERVED	0xFF000000
-
 
 /*
  * Define the maximum number of machine-dependent reference bits that are
@@ -186,6 +184,16 @@ enum invl_op_codes {
 	INVL_OP_PG_PCID           = 10,
 	INVL_OP_CACHE             = 11,
 };
+#ifndef _SMP_INVL_CB_T
+#define _SMP_INVL_CB_T
+typedef void (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
+    vm_offset_t addr2);
+#endif
+extern void
+smp_targeted_tlb_shootdown_legacy(pmap_t, vm_offset_t, vm_offset_t,
+    smp_invl_cb_t, enum invl_op_codes);
+extern void (*smp_targeted_tlb_shootdown)(pmap_t, vm_offset_t, vm_offset_t,
+    smp_invl_cb_t, enum invl_op_codes);
 
 #define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)
 #define	pmap_wired_count(pm)	((pm)->pm_stats.wired_count)

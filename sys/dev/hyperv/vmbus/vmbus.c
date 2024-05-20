@@ -44,6 +44,10 @@
 #include <sys/systm.h>
 #include <sys/taskqueue.h>
 
+#include <vm/vm.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_param.h>
+#include <vm/pmap.h>
 
 #include <machine/bus.h>
 #if defined(__aarch64__)
@@ -135,6 +139,8 @@ static void			vmbus_event_proc_dummy(struct vmbus_softc *,
 				    int);
 static bus_dma_tag_t	vmbus_get_dma_tag(device_t parent, device_t child);
 static struct vmbus_softc	*vmbus_sc;
+static void free_pcpu_ptr(void);
+static void alloc_pcpu_ptr(void);
 
 SYSCTL_NODE(_hw, OID_AUTO, vmbus, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "Hyper-V vmbus");
@@ -750,6 +756,7 @@ vmbus_synic_setup(void *xsc)
 
 	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
 		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
+	alloc_pcpu_ptr();
 	/*
 	 * Setup the SynIC message.
 	 */
@@ -787,26 +794,24 @@ vmbus_synic_setup(void *xsc)
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(MSR_HV_SCONTROL, val);
 	hv_synic_done = 1;
+	smp_targeted_tlb_shootdown = &hv_vm_tlb_flush_dummy;
 }
 
 #if defined(__x86_64__)
-uint64_t
+void
 hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-			cpuset_t mask, enum invl_op_codes op)
+			smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
-	if (hv_synic_done) {
-		struct vmbus_softc *sc = vmbus_get_softc();
-		return(hv_vm_tlb_flush(pmap, addr1, addr2, mask, op, sc));
-	}
-	return EINVAL;
+	struct vmbus_softc *sc = vmbus_get_softc();
+	return hv_vm_tlb_flush(pmap, addr1, addr2, op, sc, curcpu_cb);
 }
 #else
 
-uint64_t
+void
 hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-			cpuset_t mask, enum invl_op_codes op)
+			smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
-	return EINVAL;
+	return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
 }
 #endif /*__x86_64__*/
 
@@ -844,6 +849,7 @@ vmbus_synic_teardown(void *arg)
 	 */
 	orig = RDMSR(MSR_HV_SIEFP);
 	WRMSR(MSR_HV_SIEFP, (orig & MSR_HV_SIEFP_RSVD_MASK));
+	free_pcpu_ptr();
 }
 
 static int
@@ -1403,7 +1409,8 @@ static void alloc_pcpu_ptr(void)
 	void **hv_cpu_mem;
 	CPU_FOREACH(cpu){
 		  hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
-		  *hv_cpu_mem = malloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO);
+		  *hv_cpu_mem = contigmalloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO,
+				                     0ul, ~0ul, PAGE_SIZE, 0); 
 	}
 }
 
@@ -1414,7 +1421,7 @@ static void free_pcpu_ptr(void)
 	CPU_FOREACH(cpu){
 		hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem);
 		if(*hv_cpu_mem)
-			free(*hv_cpu_mem, M_DEVBUF);
+			contigfree(*hv_cpu_mem, PAGE_SIZE, M_DEVBUF);
 	}
 }
 
@@ -1440,7 +1447,6 @@ vmbus_doattach(struct vmbus_softc *sc)
 	ACPI_HANDLE handle;
 	unsigned int coherent = 0;
 	
-	alloc_pcpu_ptr();
 
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);
@@ -1551,7 +1557,6 @@ cleanup:
 		sc->vmbus_xc = NULL;
 	}
 	free(__DEVOLATILE(void *, sc->vmbus_chmap), M_DEVBUF);
-	free_pcpu_ptr();
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
@@ -1630,7 +1635,6 @@ vmbus_detach(device_t dev)
 	}
 
 	free(__DEVOLATILE(void *, sc->vmbus_chmap), M_DEVBUF);
-	free_pcpu_ptr();
 	mtx_destroy(&sc->vmbus_prichan_lock);
 	mtx_destroy(&sc->vmbus_chan_lock);
 
