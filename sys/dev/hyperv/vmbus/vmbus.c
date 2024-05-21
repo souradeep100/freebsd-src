@@ -210,7 +210,6 @@ static driver_t vmbus_driver = {
 	sizeof(struct vmbus_softc)
 };
 
-int hv_synic_done = 0;
 uint32_t hv_max_vp_index;
 DPCPU_DEFINE(void *, hv_pcpu_mem);
 
@@ -796,25 +795,15 @@ vmbus_synic_setup(void *xsc)
 	orig = RDMSR(MSR_HV_SCONTROL);
 	val = MSR_HV_SCTRL_ENABLE | (orig & MSR_HV_SCTRL_RSVD_MASK);
 	WRMSR(MSR_HV_SCONTROL, val);
-	hv_synic_done = 1;
-	smp_targeted_tlb_shootdown = &hv_vm_tlb_flush_dummy;
 }
 
 #if defined(__x86_64__)
 void
-hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+hyperv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 			smp_invl_local_cb_t curcpu_cb, enum invl_op_codes op)
 {
 	struct vmbus_softc *sc = vmbus_get_softc();
 	return hv_vm_tlb_flush(pmap, addr1, addr2, op, sc, curcpu_cb);
-}
-#else
-
-void
-hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-			smp_invl_local_cb_t curcpu_cb, enum invl_op_codes op)
-{
-	return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
 }
 #endif /*__x86_64__*/
 
@@ -1512,6 +1501,10 @@ vmbus_doattach(struct vmbus_softc *sc)
 		device_printf(sc->vmbus_dev, "smp_started = %d\n", smp_started);
 	smp_rendezvous(NULL, vmbus_synic_setup, NULL, sc);
 	sc->vmbus_flags |= VMBUS_FLAG_SYNIC;
+
+#if defined(__x86_64__)
+	smp_targeted_tlb_shootdown = &hyperv_vm_tlb_flush;
+#endif
 
 	/*
 	 * Initialize vmbus, e.g. connect to Hypervisor.

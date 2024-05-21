@@ -138,10 +138,12 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	/*
 	 * KPTI should be disabled in Hyper-V.
 	 */
-	if (!hv_synic_done || (op != INVL_OP_TLB &&
-				op != INVL_OP_PGRNG && op != INVL_OP_PG))
+	if (op != INVL_OP_TLB && op != INVL_OP_PGRNG && op != INVL_OP_PG)
 		return smp_targeted_tlb_shootdown_native(pmap, addr1, addr2, curcpu_cb, op);
 
+	flush = *DPCPU_PTR(hv_pcpu_mem);
+	if(flush == NULL)
+		return smp_targeted_tlb_shootdown_native(pmap, addr1, addr2, curcpu_cb, op);
 	/*
 	 * It is not necessary to signal other CPUs while booting or
 	 * when in the debugger.
@@ -171,12 +173,6 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	KASSERT((read_rflags() & PSL_I) != 0,
 			("hv_tlb_flush: interrupts disabled"));
 	critical_enter();
-
-	if(*DPCPU_PTR(hv_pcpu_mem) == NULL)
-		goto native;
-
-	flush = *DPCPU_PTR(hv_pcpu_mem);
-
 	flush->processor_mask = 0;
 	cr3 = pmap->pm_cr3;
 

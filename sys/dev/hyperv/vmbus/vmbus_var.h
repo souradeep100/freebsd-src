@@ -218,13 +218,12 @@ void    vmbus_intr_teardown1(struct vmbus_softc *sc);
 
 DPCPU_DECLARE(void *, hv_pcpu_mem);
 
-extern int hv_synic_done;
 extern uint32_t hv_max_vp_index;
 
 
-void	hv_vm_tlb_flush_dummy(pmap_t, vm_offset_t,
-				vm_offset_t, smp_invl_local_cb_t, enum invl_op_codes);
 #if defined(__x86_64__)
+void	hyperv_vm_tlb_flush(pmap_t, vm_offset_t,
+				vm_offset_t, smp_invl_local_cb_t, enum invl_op_codes);
 uint64_t	hv_flush_tlb_others_ex(pmap_t, vm_offset_t,
 				vm_offset_t, cpuset_t, enum invl_op_codes, struct vmbus_softc *);
 
