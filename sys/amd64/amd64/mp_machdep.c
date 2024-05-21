@@ -102,8 +102,7 @@ void *bootpcpu;
 
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
-void (*smp_targeted_tlb_shootdown)(pmap_t, vm_offset_t, vm_offset_t,
-    smp_invl_cb_t, enum invl_op_codes);
+smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_legacy; 
 /*
  * Local data and functions.
  */

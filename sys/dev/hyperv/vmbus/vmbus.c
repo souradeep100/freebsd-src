@@ -745,6 +745,7 @@ vmbus_synic_setup(void *xsc)
 	int cpu = curcpu;
 	uint64_t val, orig;
 	uint32_t sint;
+	void **hv_cpu_mem;
 
 	if (hyperv_features & CPUID_HV_MSR_VP_INDEX) {
 		/* Save virtual processor id. */
@@ -756,7 +757,9 @@ vmbus_synic_setup(void *xsc)
 
 	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
 		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
-	alloc_pcpu_ptr();
+	hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
+	*hv_cpu_mem = contigmalloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO,
+				0ul, ~0ul, PAGE_SIZE, 0);
 	/*
 	 * Setup the SynIC message.
 	 */
@@ -1403,16 +1406,6 @@ vmbus_probe(device_t dev)
 	return (BUS_PROBE_DEFAULT);
 }
 
-static void alloc_pcpu_ptr(void)
-{
-	int cpu;
-	void **hv_cpu_mem;
-	CPU_FOREACH(cpu){
-		  hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
-		  *hv_cpu_mem = contigmalloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO,
-				                     0ul, ~0ul, PAGE_SIZE, 0); 
-	}
-}
 
 static void free_pcpu_ptr(void)
 {

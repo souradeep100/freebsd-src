@@ -203,7 +203,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 			goto legacy;
 	}
 	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);
-	if (op == INVL_OP_PG) {
+	if (addr2 == 0) {
 		flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
 		status = hypercall_do_md(HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE, (uint64_t)flush,
 				(uint64_t)NULL);
@@ -286,7 +286,7 @@ hv_flush_tlb_others_ex(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2, const 
 		sizeof(flush->hv_vp_set.bank_contents[0])) /
 		sizeof(flush->hv_vp_set.bank_contents[0]);
 
-	if (op == INVL_OP_PG) {
+	if (addr2 == 0) {
                 flush->flags |= HV_FLUSH_NON_GLOBAL_MAPPINGS_ONLY;
                 status = hv_do_rep_hypercall(
                         HVCALL_FLUSH_VIRTUAL_ADDRESS_SPACE_EX,

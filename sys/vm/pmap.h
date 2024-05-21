@@ -189,11 +189,13 @@ enum invl_op_codes {
 typedef void (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
     vm_offset_t addr2);
 #endif
+typedef void (*smp_targeted_tlb_shootdown_t)(pmap_t, vm_offset_t, vm_offset_t,
+		smp_invl_cb_t, enum invl_op_codes);
+
 extern void
 smp_targeted_tlb_shootdown_legacy(pmap_t, vm_offset_t, vm_offset_t,
     smp_invl_cb_t, enum invl_op_codes);
-extern void (*smp_targeted_tlb_shootdown)(pmap_t, vm_offset_t, vm_offset_t,
-    smp_invl_cb_t, enum invl_op_codes);
+extern smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown;
 
 #define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)
 #define	pmap_wired_count(pm)	((pm)->pm_stats.wired_count)
