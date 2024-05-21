@@ -115,7 +115,7 @@ static inline unsigned int hv_repcomp(uint64_t status)
  * Rep hypercalls. Callers of this functions are supposed to ensure that
  * rep_count and varhead_size comply with Hyper-V hypercall definition.
  */
-uint64_t 
+uint64_t
 hv_do_rep_hypercall(uint16_t code, uint16_t rep_count, uint16_t varhead_size,
 				      uint64_t input, uint64_t output)
 {

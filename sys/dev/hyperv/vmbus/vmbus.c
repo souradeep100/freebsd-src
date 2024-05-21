@@ -757,7 +757,7 @@ vmbus_synic_setup(void *xsc)
 
 	if (VMBUS_PCPU_GET(sc, vcpuid, cpu) > hv_max_vp_index)
 		hv_max_vp_index = VMBUS_PCPU_GET(sc, vcpuid, cpu);
-	hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem); 
+	hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem);
 	*hv_cpu_mem = contigmalloc(PAGE_SIZE, M_DEVBUF, M_WAITOK | M_ZERO,
 				0ul, ~0ul, PAGE_SIZE, 0);
 	/*

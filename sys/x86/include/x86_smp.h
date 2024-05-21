@@ -83,6 +83,7 @@ inthand_t
 
 typedef void (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
     vm_offset_t addr2);
+
 #ifdef __i386__
 void	alloc_ap_trampoline(vm_paddr_t *physmap, unsigned int *physmap_idx);
 #endif
