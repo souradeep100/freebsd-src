@@ -15,7 +15,6 @@ CWARNFLAGS?=	-Wall -Wstrict-prototypes \
 # Disable a few warnings for clang, since there are several places in the
 # kernel where fixing them is more trouble than it is worth, or where there is
 # a false positive.
-#
 .if ${COMPILER_TYPE} == "clang"
 NO_WCONSTANT_CONVERSION=	-Wno-error=constant-conversion
 NO_WSHIFT_COUNT_NEGATIVE=	-Wno-shift-count-negative

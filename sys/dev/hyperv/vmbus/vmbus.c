@@ -803,7 +803,7 @@ vmbus_synic_setup(void *xsc)
 #if defined(__x86_64__)
 void
 hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-			smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
+			smp_invl_local_cb_t curcpu_cb, enum invl_op_codes op)
 {
 	struct vmbus_softc *sc = vmbus_get_softc();
 	return hv_vm_tlb_flush(pmap, addr1, addr2, op, sc, curcpu_cb);
@@ -812,7 +812,7 @@ hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 
 void
 hv_vm_tlb_flush_dummy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-			smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
+			smp_invl_local_cb_t curcpu_cb, enum invl_op_codes op)
 {
 	return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
 }
@@ -1409,13 +1409,11 @@ vmbus_probe(device_t dev)
 
 static void free_pcpu_ptr(void)
 {
-	int cpu;
+	int cpu = curcpu;
 	void **hv_cpu_mem;
-	CPU_FOREACH(cpu){
-		hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem);
-		if(*hv_cpu_mem)
-			contigfree(*hv_cpu_mem, PAGE_SIZE, M_DEVBUF);
-	}
+	hv_cpu_mem = DPCPU_ID_PTR(cpu, hv_pcpu_mem);
+	if(*hv_cpu_mem)
+		contigfree(*hv_cpu_mem, PAGE_SIZE, M_DEVBUF);
 }
 
 /**
@@ -1439,7 +1437,6 @@ vmbus_doattach(struct vmbus_softc *sc)
 	device_t dev_res;
 	ACPI_HANDLE handle;
 	unsigned int coherent = 0;
-	
 
 	if (sc->vmbus_flags & VMBUS_FLAG_ATTACHED)
 		return (0);

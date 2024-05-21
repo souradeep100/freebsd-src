@@ -102,7 +102,7 @@ void *bootpcpu;
 
 extern u_int mptramp_la57;
 extern u_int mptramp_nx;
-smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_legacy; 
+smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown = &smp_targeted_tlb_shootdown_native;
 /*
  * Local data and functions.
  */
@@ -166,7 +166,6 @@ cpu_mp_start(void)
 	mptramp_nx = pg_nx != 0;
 	MPASS(kernel_pmap->pm_cr3 < (1UL << 32));
 	mptramp_pagetables = kernel_pmap->pm_cr3;
-
 
 	/* Start each Application Processor */
 	start_all_aps();
@@ -587,7 +586,7 @@ invl_scoreboard_slot(u_int cpu)
  * completion.
  */
 void
-smp_targeted_tlb_shootdown_legacy(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
+smp_targeted_tlb_shootdown_native(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
     smp_invl_cb_t curcpu_cb, enum invl_op_codes op)
 {
 	cpuset_t mask;

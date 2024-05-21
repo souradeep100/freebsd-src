@@ -223,13 +223,13 @@ extern uint32_t hv_max_vp_index;
 
 
 void        hv_vm_tlb_flush_dummy(pmap_t, vm_offset_t,
-		                vm_offset_t, smp_invl_cb_t, enum invl_op_codes);
+		                vm_offset_t, smp_invl_local_cb_t, enum invl_op_codes);
 #if defined(__x86_64__)
 uint64_t	hv_flush_tlb_others_ex(pmap_t, vm_offset_t,
 		                vm_offset_t, cpuset_t, enum invl_op_codes, struct vmbus_softc *);
 
 void        hv_vm_tlb_flush(pmap_t, vm_offset_t,
 		                vm_offset_t, enum invl_op_codes,
-			       	struct vmbus_softc *, smp_invl_cb_t);
+			       	struct vmbus_softc *, smp_invl_local_cb_t);
 #endif /* __x86_64__ */
 #endif	/* !_VMBUS_VAR_H_ */

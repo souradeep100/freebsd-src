@@ -126,7 +126,7 @@ inline int hv_cpumask_to_vpset(struct hv_vpset *vpset,
 
 void
 hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
-		enum invl_op_codes op, struct vmbus_softc *sc, smp_invl_cb_t curcpu_cb)
+		enum invl_op_codes op, struct vmbus_softc *sc, smp_invl_local_cb_t curcpu_cb)
 {
 	cpuset_t tmp_mask, mask;
 	struct hyperv_tlb_flush *flush;
@@ -135,8 +135,12 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	uint64_t status = 0;
 	uint64_t cr3;
 
-	if (!hv_synic_done)
-		return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
+	/* 
+	 * KPTI should be disabled in Hyper-V.
+	 */
+	if (!hv_synic_done || (op != INVL_OP_TLB &&
+		op != INVL_OP_PGRNG && op != INVL_OP_PG))
+		return smp_targeted_tlb_shootdown_native(pmap, addr1, addr2, curcpu_cb, op);
 
         /*
          * It is not necessary to signal other CPUs while booting or
@@ -169,7 +173,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
         critical_enter();
 
 	if(*DPCPU_PTR(hv_pcpu_mem) == NULL)
-		goto legacy;
+		goto native;
 
 	flush = *DPCPU_PTR(hv_pcpu_mem);
 
@@ -200,7 +204,7 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 			set_bit(vcpu, &flush->processor_mask);
 		}
 		if (! flush->processor_mask )
-			goto legacy;
+			goto native;
 	}
 	max_gvas = (PAGE_SIZE - sizeof(*flush)) / sizeof(flush->gva_list[0]);
 	if (addr2 == 0) {
@@ -219,9 +223,8 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 					     gva_n, 0, (uint64_t)flush, (uint64_t)NULL);
 
 	}
-	printf("the status of tlb_flush %lu\n", status);
 	if(status)
-		goto legacy;
+		goto native;
 	sched_unpin();
 	critical_exit();
 	return;
@@ -235,14 +238,14 @@ local_cb:
 do_ex_hypercall:
 	status = hv_flush_tlb_others_ex(pmap, addr1, addr2, mask, op, sc);
 	if (status)
-		goto legacy;
+		goto native;
 	sched_unpin();
 	critical_exit();
 	return;
-legacy:
+native:
 	sched_unpin();
 	critical_exit();
-	return smp_targeted_tlb_shootdown_legacy(pmap, addr1, addr2, curcpu_cb, op);
+	return smp_targeted_tlb_shootdown_native(pmap, addr1, addr2, curcpu_cb, op);
 }
 
 uint64_t

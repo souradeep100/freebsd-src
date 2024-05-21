@@ -81,11 +81,8 @@ inthand_t
 	IDTVEC(cpususpend),	/* CPU suspends & waits to be resumed */
 	IDTVEC(rendezvous);	/* handle CPU rendezvous */
 
-#ifndef _SMP_INVL_CB_T
-#define _SMP_INVL_CB_T
 typedef void (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
     vm_offset_t addr2);
-#endif
 #ifdef __i386__
 void	alloc_ap_trampoline(vm_paddr_t *physmap, unsigned int *physmap_idx);
 #endif

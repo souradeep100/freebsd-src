@@ -86,7 +86,6 @@ typedef struct pmap_statistics *pmap_statistics_t;
  * void		pmap_page_set_memattr(vm_page_t, vm_memattr_t);
  */
 #include <machine/pmap.h>
-
 #ifdef _KERNEL
 #include <sys/_cpuset.h>
 struct thread;
@@ -184,17 +183,14 @@ enum invl_op_codes {
 	INVL_OP_PG_PCID           = 10,
 	INVL_OP_CACHE             = 11,
 };
-#ifndef _SMP_INVL_CB_T
-#define _SMP_INVL_CB_T
-typedef void (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
+typedef void (*smp_invl_local_cb_t)(struct pmap *, vm_offset_t addr1,
     vm_offset_t addr2);
-#endif
 typedef void (*smp_targeted_tlb_shootdown_t)(pmap_t, vm_offset_t, vm_offset_t,
-		smp_invl_cb_t, enum invl_op_codes);
+		smp_invl_local_cb_t, enum invl_op_codes);
 
 extern void
-smp_targeted_tlb_shootdown_legacy(pmap_t, vm_offset_t, vm_offset_t,
-    smp_invl_cb_t, enum invl_op_codes);
+smp_targeted_tlb_shootdown_native(pmap_t, vm_offset_t, vm_offset_t,
+    smp_invl_local_cb_t, enum invl_op_codes);
 extern smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown;
 
 #define	pmap_resident_count(pm)	((pm)->pm_stats.resident_count)
