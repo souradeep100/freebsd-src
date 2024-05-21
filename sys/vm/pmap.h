@@ -86,6 +86,7 @@ typedef struct pmap_statistics *pmap_statistics_t;
  * void		pmap_page_set_memattr(vm_page_t, vm_memattr_t);
  */
 #include <machine/pmap.h>
+
 #ifdef _KERNEL
 #include <sys/_cpuset.h>
 struct thread;
