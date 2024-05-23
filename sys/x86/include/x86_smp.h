@@ -81,7 +81,7 @@ inthand_t
 	IDTVEC(cpususpend),	/* CPU suspends & waits to be resumed */
 	IDTVEC(rendezvous);	/* handle CPU rendezvous */
 
-typedef void (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
+typedef void    (*smp_invl_cb_t)(struct pmap *, vm_offset_t addr1,
     vm_offset_t addr2);
 
 #ifdef __i386__
