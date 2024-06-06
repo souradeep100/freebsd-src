@@ -138,10 +138,11 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	/*
 	 * KPTI should be disabled in Hyper-V.
 	 */
-	if (op != INVL_OP_TLB && op != INVL_OP_PGRNG && op != INVL_OP_PG)
+	if (op == INVL_OP_CACHE) {
 		return smp_targeted_tlb_shootdown_native(pmap, addr1, addr2, curcpu_cb, op);
+	}
+	flush = *DPCPU_ID_PTR(curcpu, hv_pcpu_mem);
 
-	flush = *DPCPU_PTR(hv_pcpu_mem);
 	if(flush == NULL)
 		return smp_targeted_tlb_shootdown_native(pmap, addr1, addr2, curcpu_cb, op);
 	/*
@@ -175,8 +176,8 @@ hv_vm_tlb_flush(pmap_t pmap, vm_offset_t addr1, vm_offset_t addr2,
 	critical_enter();
 	flush->processor_mask = 0;
 	cr3 = pmap->pm_cr3;
-
-	if (op == INVL_OP_TLB) {
+	if (op == INVL_OP_TLB || op == INVL_OP_TLB_INVPCID ||
+		op == INVL_OP_TLB_INVPCID_PTI || op == INVL_OP_TLB_PCID) {
 		flush->address_space = 0;
 		flush->flags = HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES;
 	} else {

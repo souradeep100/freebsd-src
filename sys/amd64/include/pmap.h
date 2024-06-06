@@ -580,8 +580,35 @@ pmap_pml5e_index(vm_offset_t va)
 	return ((va >> PML5SHIFT) & ((1ul << NPML5EPGSHIFT) - 1));
 }
 
-#endif /* !LOCORE */
+/*
+ * Invalidation request.  PCPU pc_smp_tlb_op uses u_int instead of the
+ * enum to avoid both namespace and ABI issues (with enums).
+ */
+enum invl_op_codes {
+	INVL_OP_TLB               = 1,
+	INVL_OP_TLB_INVPCID       = 2,
+	INVL_OP_TLB_INVPCID_PTI   = 3,
+	INVL_OP_TLB_PCID          = 4,
+	INVL_OP_PGRNG             = 5,
+	INVL_OP_PGRNG_INVPCID     = 6,
+	INVL_OP_PGRNG_PCID        = 7,
+	INVL_OP_PG                = 8,
+	INVL_OP_PG_INVPCID        = 9,
+	INVL_OP_PG_PCID           = 10,
+	INVL_OP_CACHE             = 11,
+};
+typedef void    (*smp_invl_local_cb_t)(struct pmap *, vm_offset_t addr1,
+    vm_offset_t addr2);
+typedef void    (*smp_targeted_tlb_shootdown_t)(pmap_t, vm_offset_t,
+    vm_offset_t, smp_invl_local_cb_t, enum invl_op_codes);
+
+extern void smp_targeted_tlb_shootdown_native(pmap_t, vm_offset_t, vm_offset_t,
+    smp_invl_local_cb_t, enum invl_op_codes);
+extern smp_targeted_tlb_shootdown_t smp_targeted_tlb_shootdown;
 
 #endif /* !_MACHINE_PMAP_H_ */
+
+
+#endif /* !LOCORE */
 
 #endif /* __i386__ */
